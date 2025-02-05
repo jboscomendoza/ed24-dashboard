@@ -1,5 +1,5 @@
-import streamlit as st
 import pyarrow
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 
@@ -30,7 +30,6 @@ st.set_page_config(
     page_title="Evaluación diagnóstica 2024",
     page_icon=":book:",
     layout="wide",
-
 )
 
 st.title("Evaluación Diagnóstica 2024")
@@ -62,7 +61,7 @@ ed_filtro = ed_filtro.loc[
     ]
 
 st.markdown("## Dificultad de los criterios")
-
+ 
 fig = px.scatter(
     ed_filtro,
     x="item",
