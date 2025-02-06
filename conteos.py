@@ -37,7 +37,7 @@ tab_grado, tab_servicios = st.tabs(["Grado", "Servicios"])
 
 with tab_grado:
     with st.sidebar:
-        sel_cnt_nivel = st.selectbox("Nivel", options = NIVELES_GRADO.keys())
+        sel_cnt_nivel = st.selectbox("Nivel", options = NIVELES_GRADO.keys(), index=2)
         sel_cnt_grado = st.selectbox("Grado", options = NIVELES_GRADO[sel_cnt_nivel])
 
     conteo_grado_filtro = conteo_grado.loc[
