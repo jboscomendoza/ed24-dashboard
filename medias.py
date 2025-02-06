@@ -70,7 +70,7 @@ for eia in medias_filtro["eia"].unique():
     if orden == "Proceso":
         medias_filtro_eia = medias_filtro_eia.sort_values("proceso")
     elif orden == "Reactivo":
-        medias_filtro_eia = medias_filtro_eia.sort_values("item")
+        medias_filtro_eia = medias_filtro_eia.sort_values(["consigna", "inciso", "item"])
     elif orden == "Media":
         medias_filtro_eia = medias_filtro_eia.sort_values("media", ascending=False)
 
