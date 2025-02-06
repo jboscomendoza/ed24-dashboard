@@ -3,6 +3,7 @@ import streamlit as st
 pages = {
     "Resultados": [
         st.Page("medias.py",  title="Medias"),
+        st.Page("irt.py",     title="IRT"),
         st.Page("conteos.py", title="Conteos"),
         st.Page("items.py",   title="Items"),
     ]

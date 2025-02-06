@@ -22,16 +22,15 @@ conteo_servicio = pd.read_parquet("data/item_conteo_servicio.parquet")
 
 procesos = conteo_grado["proceso"].unique()
 
-
 #### Streamlit ####
 
 st.set_page_config(
-    page_title="Conteos Evaluación diagnóstica 2024",
+    page_title="Conteos - Evaluación diagnóstica 2024",
     page_icon=":snake:",
     layout="wide",
 )
 
-st.title("Conteos Evalución Diagnóstica 2024")
+st.title("Conteos Evaluación Diagnóstica 2024")
 
 tab_grado, tab_servicios = st.tabs(["Grado", "Servicios"])
 

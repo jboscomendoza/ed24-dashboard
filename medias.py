@@ -26,16 +26,17 @@ medias = pd.read_parquet("data/item_medias.parquet")
 medias = medias.merge(diccionario, how="inner", on="item")
 medias = medias.sort_values("media")
 procesos = medias["proceso"].unique()
+campos   = medias["campo"].unique()
 
 st.set_page_config(
-    page_title="Conteos Evaluación diagnóstica 2024",
+    page_title="Medias - Evaluación diagnóstica 2024",
     page_icon=":worm:",
     layout="wide",
 )
 
 #### Streamlit ####
 
-st.title("Medias Evalución Diagnóstica 2024")
+st.title("Medias Evaluación Diagnóstica 2024")
 
 with st.sidebar:
     sel_cnt_nivel = st.selectbox("Nivel", options = NIVELES_GRADO.keys(), index=2)
@@ -51,10 +52,12 @@ eia_filtro = medias_filtro["eia"].unique()
 with st.sidebar:
     sel_cnt_eia = st.multiselect("EIA", options=eia_filtro, default=eia_filtro)
     sel_cnt_proceso = st.multiselect("Proceso", options = procesos, default=procesos)
+    sel_cnt_campo   = st.multiselect("Campo formativo", options = campos, default=campos)
 
 medias_filtro = medias_filtro.loc[
     (medias_filtro["eia"].isin(sel_cnt_eia)) &
-    (medias_filtro["proceso"].isin(sel_cnt_proceso))
+    (medias_filtro["proceso"].isin(sel_cnt_proceso)) &
+    (medias_filtro["campo"].isin(sel_cnt_campo))
 ]
 
 orden = st.radio(
@@ -68,11 +71,11 @@ for eia in medias_filtro["eia"].unique():
     medias_filtro_eia = medias_filtro.loc[medias_filtro["eia"] == eia]
 
     if orden == "Proceso":
-        medias_filtro_eia = medias_filtro_eia.sort_values("proceso")
-    elif orden == "Reactivo":
-        medias_filtro_eia = medias_filtro_eia.sort_values(["consigna", "inciso", "item"])
+        medias_filtro_eia = medias_filtro_eia.sort_values(["proceso", "media"])
     elif orden == "Media":
         medias_filtro_eia = medias_filtro_eia.sort_values("media", ascending=False)
+    elif orden == "Reactivo":
+        medias_filtro_eia = medias_filtro_eia.sort_values(["consigna", "inciso", "item"])
 
     figura = go.Figure(go.Scatter(
         x=medias_filtro_eia["item"],
@@ -92,22 +95,6 @@ for eia in medias_filtro["eia"].unique():
             hovertext=medias_proceso["campo"],
             ))
     st.plotly_chart(figura)
+    campos_eia = medias_filtro_eia["campo"].unique()
     st.dataframe(medias_filtro_eia[["item", "proceso", "media", "campo", "pda", "descriptor", "criterio"]])
 
-
-for eia in medias_filtro["eia"].unique():
-    st.markdown(f"### {eia}")
-    medias_filtro_eia = medias_filtro.loc[medias_filtro["eia"] == eia]
-    fig = px.line(
-        medias_filtro_eia,
-        x="item",
-        y="media",
-        text="proceso",
-        markers=True,
-        color_discrete_sequence=COLORES,
-        hover_name="proceso",
-        hover_data=["eia", "descriptor", "criterio", "campo"],
-        labels={"media":"Media en la rúbrica", "item":"Criterio"},
-    )
-    st.plotly_chart(fig)
-    st.dataframe(medias_filtro_eia[["item", "proceso", "media", "campo", "pda", "descriptor", "criterio"]])
