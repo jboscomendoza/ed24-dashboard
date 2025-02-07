@@ -30,8 +30,40 @@ conteo_grado["resp"] = (
     .reorder_categories(["N0", "N1", "N2", "N3"], ordered=True)
 )
 
+nivel_0 = (
+    conteo_grado
+    .loc[conteo_grado["resp"] == "N0"][["item", "grado", "prop"]]
+    .rename(columns={"prop":"nivel_0"})
+    )
+nivel_3 = (
+    conteo_grado
+    .loc[conteo_grado["resp"] == "N3"][["item", "grado", "prop"]]
+    .rename(columns={"prop":"nivel_3"})
+    )
+conteo_grado = (
+    conteo_grado
+    .merge(nivel_0, on=["item", "grado"], how="left")
+    .merge(nivel_3, on=["item", "grado"], how="left")
+    )
+
 conteo_servicio = pd.read_parquet("data/item_conteo_servicio.parquet")
 conteo_servicio = conteo_servicio.merge(diccionario, how="inner", on="item")
+nivel_0_servicio = (
+    conteo_servicio
+    .loc[conteo_servicio["resp"] == "N0"][["item", "grado", "servicio", "prop"]]
+    .rename(columns={"prop":"nivel_0"})
+    )
+nivel_3_servicio = (
+    conteo_servicio
+    .loc[conteo_servicio["resp"] == "N3"][["item", "grado", "servicio", "prop"]]
+    .rename(columns={"prop":"nivel_3"})
+    )
+conteo_servicio = (
+    conteo_servicio
+    .merge(nivel_0_servicio, on=["item", "grado", "servicio"], how="left")
+    .merge(nivel_3_servicio, on=["item", "grado", "servicio"], how="left")
+    )
+
 
 procesos = conteo_grado["proceso"].unique()
 
@@ -68,9 +100,25 @@ with tab_grado:
         (conteo_grado_filtro["proceso"].isin(sel_cnt_proceso))
     ]
 
+    orden = st.radio(
+        "Ordenar por:",
+        ["Reactivo", "Campo", "Nivel 0", "Nivel 3"],
+        horizontal=True
+        )
+
     for eia in conteo_grado_filtro["eia"].unique():
         st.markdown(f"### {eia}")
         conteo_eia = conteo_grado_filtro.loc[conteo_grado_filtro["eia"] == eia]
+
+        if orden == "Reactivo":
+            conteo_eia = conteo_eia.sort_values(["consigna", "inciso", "item"])
+        elif orden == "Campo":
+            conteo_eia = conteo_eia.sort_values(["campo", "item"])
+        elif orden == "Nivel 0":
+            conteo_eia = conteo_eia.sort_values(["nivel_0", "item"])
+        elif orden == "Nivel 3":
+            conteo_eia = conteo_eia.sort_values(["nivel_3", "item"])
+        
         fig = px.bar(
             conteo_eia,
             x="item",
@@ -84,7 +132,7 @@ with tab_grado:
             height=350,
         )
         fog = px.line(
-            conteo_grado_filtro.loc[conteo_grado_filtro["eia"] == eia],
+            conteo_eia,
             x="item",
             y="prop",
             color="resp",
@@ -99,14 +147,35 @@ with tab_grado:
         st.plotly_chart(fog)
 
 with tab_servicios:
+    servicios = conteo_servicio["servicio"].unique()
+    sel_servicio = st.multiselect("Tipo de servicio", options=servicios, default=servicios)
+
     conteo_servicio_filtro = conteo_servicio.loc[
         (conteo_servicio["nivel"] == sel_cnt_nivel) &
-        (conteo_servicio["grado"] == sel_cnt_grado)
+        (conteo_servicio["grado"] == sel_cnt_grado) &
+        (conteo_servicio["servicio"].isin(sel_servicio))
         ]
-    st.title("Pendiente")
+    
+    orden_servicio = st.radio(
+        "Ordenar por:",
+        ["Reactivo", "Campo", "Nivel 0", "Nivel 3"],
+        horizontal=True, 
+        key="orden_servicio"
+        )
+
     for servicio in conteo_servicio_filtro["servicio"].unique():
         st.markdown(f"### {servicio}")
         conteo_serv = conteo_servicio_filtro.loc[conteo_servicio_filtro["servicio"] == servicio]
+        
+        if orden_servicio == "Reactivo":
+            conteo_serv = conteo_serv.sort_values(["consigna", "inciso", "item"])
+        elif orden_servicio == "Campo":
+            conteo_serv = conteo_serv.sort_values(["campo", "item"])
+        elif orden_servicio == "Nivel 0":
+            conteo_serv = conteo_serv.sort_values(["nivel_0", "item"])
+        elif orden_servicio == "Nivel 3":
+            conteo_serv = conteo_serv.sort_values(["nivel_3", "item"])
+        
         plotino = go.Figure()
         for resp in conteo_serv["resp"].unique():
             conteo_resp = conteo_serv.loc[conteo_serv["resp"] == resp]

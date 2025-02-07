@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 
 NIVELES_GRADO = {
     "Preescolar": [3],
-    "Primaria": [1, 2, 3, 4, 5, 6],
+    "Primaria":   [1, 2, 3, 4, 5, 6],
     "Secundaria": [1, 2, 3],
     }
 
@@ -85,7 +85,7 @@ for eia in medias_filtro["eia"].unique():
         x=medias_filtro_eia["item"],
         y=medias_filtro_eia["media"],
         mode="lines",
-        line=dict(color="#ffffff", width=1),
+        line=dict(color="#9999bb", width=1),
         showlegend=False,
         ))
     for proceso in medias_filtro_eia["proceso"].unique():

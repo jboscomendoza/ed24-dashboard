@@ -85,7 +85,7 @@ for eia in medias_filtro["eia"].unique():
         x=irt_filtro_eia["item_clave"],
         y=irt_filtro_eia["dificultad"],
         mode="lines",
-        line=dict(color="#ffffff", width=1),
+        line=dict(color="#9999bb", width=1),
         showlegend=False,
         ))
     for proceso in irt_filtro_eia["proceso"].unique():
