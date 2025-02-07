@@ -65,6 +65,10 @@ orden = st.radio(
     ["Proceso", "Media", "Reactivo"],
     horizontal=True
     )
+if st.checkbox("Limites 0-3"):
+    limites_y = [0, 3]
+else:
+    limites_y = None
 
 for eia in medias_filtro["eia"].unique():
     st.markdown(f"### {eia}")
@@ -94,6 +98,7 @@ for eia in medias_filtro["eia"].unique():
             marker=dict(color=COLORES_PROCESO[proceso], size=10),
             hovertext=medias_proceso["campo"],
             ))
+    figura.update_yaxes(range=limites_y)
     st.plotly_chart(figura)
     campos_eia = medias_filtro_eia["campo"].unique()
     st.dataframe(medias_filtro_eia[["item", "proceso", "media", "campo", "pda", "descriptor", "criterio"]])

@@ -30,7 +30,7 @@ campos   = irt["campo"].unique()
 
 st.set_page_config(
     page_title="IRT - Evaluación diagnóstica 2024",
-    page_icon=":bug:",
+    page_icon=":worm:",
     layout="wide",
 )
 
@@ -65,6 +65,10 @@ orden = st.radio(
     ["Proceso", "Dificultad", "Reactivo"],
     horizontal=True
     )
+if st.checkbox("Limites 0-800"):
+    limites_y = [0, 800]
+else:
+    limites_y = None
 
 for eia in medias_filtro["eia"].unique():
     st.markdown(f"### {eia}")
@@ -94,6 +98,7 @@ for eia in medias_filtro["eia"].unique():
             marker=dict(color=COLORES_PROCESO[proceso], size=10),
             hovertext=medias_proceso["campo"],
             ))
+    figura.update_yaxes(range=limites_y)
     st.plotly_chart(figura)
     campos_eia = irt_filtro_eia["campo"].unique()
     st.dataframe(irt_filtro_eia[["item_clave", "proceso", "dificultad", "campo", "pda", "descriptor", "criterio"]])

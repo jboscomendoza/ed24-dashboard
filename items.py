@@ -20,7 +20,7 @@ NIVELES_GRADO = {
 
 st.set_page_config(
     page_title="Evaluación diagnóstica 2024",
-    page_icon=":book:",
+    page_icon=":worm:",
     layout="wide",
 )
 
