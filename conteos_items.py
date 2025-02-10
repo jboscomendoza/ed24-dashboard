@@ -64,8 +64,6 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("Conteos Evaluación Diagnóstica 2024")
-
 with st.sidebar:
     niveles = conteo_grado["nivel"].unique()
     sel_nivel = st.selectbox("Nivel", options=niveles, index=2)
@@ -80,8 +78,10 @@ with st.sidebar:
     sel_consigna = st.selectbox("Consigna", options=consignas)
     conteo_filtro = conteo_filtro.loc[conteo_filtro["consigna"] == sel_consigna]
 
-criterios = conteo_filtro["criterio"].unique()
+st.markdown(f"# {conteo_filtro["eia"].unique()[0]} (Consigna {sel_consigna})")
 
+
+criterios = conteo_filtro["criterio"].unique()
 sel_criterios = st.multiselect("Criterios",options=criterios, default=criterios)
 conteo_filtro = conteo_filtro.loc[conteo_filtro["criterio"].isin(sel_criterios)]
 
