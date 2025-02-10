@@ -20,9 +20,15 @@ COLORES_RESP = {
 
 diccionario = pd.read_parquet("data/diccionario.parquet")
 diccionario = diccionario.drop(["fase", "nivel", "grado"], axis=1)
+rubrica     = pd.read_parquet("data/diccionario_rubrica.parquet")
 
 conteo_grado = pd.read_parquet("data/item_conteo_grado.parquet")
-conteo_grado = conteo_grado.merge(diccionario, how="inner", on="item")
+conteo_grado = (
+    conteo_grado
+    .merge(diccionario, how="inner", on="item")
+    .merge(rubrica, how="inner", on=["item", "resp"])
+    )
+
 conteo_grado["resp"] = (
     conteo_grado["resp"]
     .astype("category")
