@@ -92,47 +92,46 @@ for criterio in sel_criterios:
     st.markdown(f"## {criterio}")
     conteo_criterio = conteo_filtro.loc[conteo_filtro["criterio"] == criterio]
 
-    col1, col2 = st.columns([1, 2])
-        
-    with col1:
-        figura = go.Figure()
-        for resp in conteo_criterio["resp"].unique():
-            conteo_resp = conteo_criterio.loc[conteo_criterio["resp"] == resp]
-            figura.add_trace(go.Bar(
-                x=conteo_resp["grado"],
-                y=conteo_resp["prop"],
-                name=resp,
-                text=round(conteo_resp["prop"]),
-                marker=dict(color=COLORES_RESP[resp]),
-            ))
-        figura.update_layout(
-            barmode="relative",
-            height=500,
-            width=450,
-            margin=dict(t=30, b=30),
-            xaxis=dict(
-                title="Grado",
-                tickmode='array',
-                tickvals = conteo_criterio["grado"],
-                ticktext = conteo_criterio["grado"].unique(),
-                ),
-            yaxis=dict(title="Porcentaje"),
-            )
-        st.plotly_chart(figura)
+    figura = go.Figure()
+    for resp in conteo_criterio["resp"].unique():
+        conteo_resp = conteo_criterio.loc[conteo_criterio["resp"] == resp]
+        figura.add_trace(go.Bar(
+            y=conteo_resp["grado"],
+            x=conteo_resp["prop"],
+            name=resp,
+            text=round(conteo_resp["prop"]),
+            marker=dict(color=COLORES_RESP[resp]),
+            orientation="h",
+        ))
+    figura.update_layout(
+        barmode="stack",
+        height=225,
+        width=600,
+        margin=dict(t=30, b=30),
+        yaxis=dict(
+            title="Grado",
+            tickmode='array',
+            tickvals = conteo_criterio["grado"],
+            ticktext = conteo_criterio["grado"].unique(),
+            autorange="reversed",
+            ),
+        xaxis=dict(title="Porcentaje"),
+        font=dict(family="Noto Sans, serif")
+        )
+    st.plotly_chart(figura)
     
-    with col2:
-        st.markdown(f"### Información del criterio")
-        st.table((
-            conteo_criterio[COLS_INFORMACION]
-            .rename(str.title, axis="columns")
-            .drop_duplicates()
-            .reset_index(drop=True)
-            ))
-        conteo_criterio = (
-            conteo_criterio[["resp", "resp_nivel", "resp_rubrica"]]
-            .drop_duplicates()
-            .rename(columns={"resp":"Respuesta", "resp_nivel":"Nivel", "resp_rubrica":"Rúbrica"})
-            .reset_index(drop=True)
-            )
-        st.markdown(f"### Niveles de la rúbrica")
-        st.table(conteo_criterio)
+    st.markdown(f"### Información del criterio")
+    st.table((
+        conteo_criterio[COLS_INFORMACION]
+        .rename(str.title, axis="columns")
+        .drop_duplicates()
+        .reset_index(drop=True)
+        ))
+    conteo_criterio = (
+        conteo_criterio[["resp", "resp_nivel", "resp_rubrica"]]
+        .drop_duplicates()
+        .rename(columns={"resp":"Respuesta", "resp_nivel":"Nivel", "resp_rubrica":"Rúbrica"})
+        .reset_index(drop=True)
+        )
+    st.markdown(f"### Niveles de la rúbrica")
+    st.table(conteo_criterio)
