@@ -10,13 +10,8 @@ NIVELES_GRADO = {
     "Secundaria": [1, 2, 3],
     }
 
-COLORES = ["#ff595e", "#ffca3a", "#8ac926", "#1982c4"]
-COLORES_RESP = {
-    "N0":"#ff595e",
-    "N1":"#ffca3a",
-    "N2":"#8ac926",
-    "N3":"#1982c4"
-    }
+COLORES = ["#fcb1c3", "#fce397", "#bae673", "#a4dafc"]
+COLORES_RESP = dict(zip(["N0", "N1", "N2", "N3"], COLORES))
 
 COLS_INFORMACION = ["campo", "contenido", "pda", "descriptor", "proceso"]
 
@@ -100,6 +95,7 @@ for criterio in sel_criterios:
             x=conteo_resp["prop"],
             name=resp,
             text=round(conteo_resp["prop"]),
+            insidetextanchor="middle",
             marker=dict(color=COLORES_RESP[resp]),
             orientation="h",
         ))
@@ -116,7 +112,7 @@ for criterio in sel_criterios:
             autorange="reversed",
             ),
         xaxis=dict(title="Porcentaje"),
-        font=dict(family="Noto Sans, serif")
+        font=dict(family="Noto Sans, serif", size=16)
         )
     st.plotly_chart(figura)
     

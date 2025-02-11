@@ -10,13 +10,8 @@ NIVELES_GRADO = {
     "Secundaria": [1, 2, 3],
     }
 
-COLORES = ["#ff595e", "#ffca3a", "#8ac926", "#1982c4"]
-COLORES_RESP = {
-    "N0":"#ff595e",
-    "N1":"#ffca3a",
-    "N2":"#8ac926",
-    "N3":"#1982c4"
-    }
+COLORES = ["#fcb1c3", "#fce397", "#bae673", "#a4dafc"]
+COLORES_RESP = dict(zip(["N0", "N1", "N2", "N3"], COLORES))
 
 diccionario = pd.read_parquet("data/diccionario.parquet")
 diccionario = diccionario.drop(["fase", "nivel", "grado"], axis=1)

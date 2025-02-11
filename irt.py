@@ -10,14 +10,12 @@ NIVELES_GRADO = {
     "Secundaria": [1, 2, 3],
     }
 
-COLORES = ["#8338ec", "#ffca3a", "#8ac926", "#1982c4"]
-COLORES_PROCESO = {
-    "Recuperación de información":"#ff595e",
-    "Comprensión":"#ffca3a",
-    "Análisis":"#8ac926",
-    "Utilización del conocimiento":"#1982c4",
-    "No definido":"#ffffff",
-}
+COLORES = ["#8338ec", "#ffca3a", "#8ac926", "#1982c4", "#cccccc"]
+PROCESOS = [
+    "Recuperación de información", "Comprensión", "Análisis", 
+    "Utilización del conocimiento", "No definido"
+    ]
+COLORES_PROCESO = dict(zip(PROCESOS, COLORES))
 
 diccionario = pd.read_parquet("data/diccionario.parquet")
 diccionario = diccionario.drop(["grado"], axis=1)
