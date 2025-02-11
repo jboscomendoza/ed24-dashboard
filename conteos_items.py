@@ -18,6 +18,8 @@ COLORES_RESP = {
     "N3":"#1982c4"
     }
 
+COLS_INFORMACION = ["campo", "contenido", "pda", "descriptor", "proceso"]
+
 diccionario = pd.read_parquet("data/diccionario.parquet")
 diccionario = diccionario.drop(["fase", "nivel", "grado"], axis=1)
 rubrica     = pd.read_parquet("data/diccionario_rubrica.parquet")
@@ -39,6 +41,7 @@ conteo_grado["resp"] = (
 conteo_grado["consigna"] = conteo_grado["consigna"].astype("int").astype("str")
 conteo_grado["grado"] = conteo_grado["grado"].astype("int").astype("str")
 
+
 nivel_0 = (
     conteo_grado
     .loc[conteo_grado["resp"] == "N0"][["item", "grado", "prop"]]
@@ -55,11 +58,10 @@ conteo_grado = (
     .merge(nivel_3, on=["item", "grado"], how="left")
     )
 
-
 #### Streamlit ####
 
 st.set_page_config(
-    page_title="Conteos por criterio- Evaluación diagnóstica 2024",
+    page_title="Conteos por criterio - Evaluación diagnóstica 2024",
     page_icon=":worm:",
     layout="wide",
 )
@@ -80,48 +82,57 @@ with st.sidebar:
 
 st.markdown(f"# {conteo_filtro["eia"].unique()[0]} (Consigna {sel_consigna})")
 
-
 criterios = conteo_filtro["criterio"].unique()
 sel_criterios = st.multiselect("Criterios",options=criterios, default=criterios)
 conteo_filtro = conteo_filtro.loc[conteo_filtro["criterio"].isin(sel_criterios)]
 
+
 for criterio in sel_criterios:
+    st.divider()
     st.markdown(f"## {criterio}")
     conteo_criterio = conteo_filtro.loc[conteo_filtro["criterio"] == criterio]
 
-    st.markdown("### Información del criterio")
-    for i in ["campo", "contenido", "pda", "descriptor", "proceso"]:
-        st.markdown(f"* **{i.title()}:** {conteo_criterio[i].unique()[0]}")
-
-    grados = conteo_criterio["grado"].unique()
-    num_grados = len(grados)
-    columns = st.columns(num_grados)
-    for i in range(num_grados):
-        with columns[i]:
-            st.markdown(f"### Grado {grados[i]}")
-            fig = go.Figure()
-            conteo_grado = conteo_criterio.loc[conteo_criterio["grado"] == grados[i]]
-            resps = conteo_grado["resp"].unique()
-            for resp in resps:
-                conteo_resp = conteo_grado.loc[conteo_grado["resp"] == resp] 
-                fig.add_trace(go.Bar(
-                    x=conteo_resp["item"],
-                    y=conteo_resp["prop"],
-                    text=round(conteo_resp["prop"]),
-                    name=resp,
-                    marker=dict(color = COLORES_RESP[resp]),
-                    ))
-            fig.update_layout(
-                barmode="stack",
-                margin=dict(t=35, b=35),
-                width=300,
-                height=350,
+    col1, col2 = st.columns([1, 2])
+        
+    with col1:
+        figura = go.Figure()
+        for resp in conteo_criterio["resp"].unique():
+            conteo_resp = conteo_criterio.loc[conteo_criterio["resp"] == resp]
+            figura.add_trace(go.Bar(
+                x=conteo_resp["grado"],
+                y=conteo_resp["prop"],
+                name=resp,
+                text=round(conteo_resp["prop"]),
+                marker=dict(color=COLORES_RESP[resp]),
+            ))
+        figura.update_layout(
+            barmode="relative",
+            height=500,
+            width=450,
+            margin=dict(t=30, b=30),
+            xaxis=dict(
+                title="Grado",
+                tickmode='array',
+                tickvals = conteo_criterio["grado"],
+                ticktext = conteo_criterio["grado"].unique(),
+                ),
+            yaxis=dict(title="Porcentaje"),
             )
-            st.plotly_chart(fig)
+        st.plotly_chart(figura)
     
-    st.markdown(f"### Niveles de la rúbrica")
-    st.table(
-        conteo_criterio[["resp", "resp_rubrica"]].drop_duplicates()
+    with col2:
+        st.markdown(f"### Información del criterio")
+        st.table((
+            conteo_criterio[COLS_INFORMACION]
+            .rename(str.title, axis="columns")
+            .drop_duplicates()
+            .reset_index(drop=True)
+            ))
+        conteo_criterio = (
+            conteo_criterio[["resp", "resp_nivel", "resp_rubrica"]]
+            .drop_duplicates()
+            .rename(columns={"resp":"Respuesta", "resp_nivel":"Nivel", "resp_rubrica":"Rúbrica"})
+            .reset_index(drop=True)
             )
-
-
+        st.markdown(f"### Niveles de la rúbrica")
+        st.table(conteo_criterio)
