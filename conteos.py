@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 NIVELES_GRADO = {
     "Preescolar": [3],
@@ -17,6 +18,7 @@ diccionario = pd.read_parquet("data/diccionario.parquet")
 diccionario = diccionario.drop(["fase", "nivel", "grado"], axis=1)
 rubrica     = pd.read_parquet("data/diccionario_rubrica.parquet")
 
+# Data de conteos 
 conteo_grado = pd.read_parquet("data/item_conteo_grado.parquet")
 conteo_grado = (
     conteo_grado
@@ -47,6 +49,7 @@ conteo_grado = (
     .merge(nivel_3, on=["item", "grado"], how="left")
     )
 
+# Conteo por servicio 
 conteo_servicio = pd.read_parquet("data/item_conteo_servicio.parquet")
 conteo_servicio = conteo_servicio.merge(diccionario, how="inner", on="item")
 nivel_0_servicio = (
@@ -65,8 +68,14 @@ conteo_servicio = (
     .merge(nivel_3_servicio, on=["item", "grado", "servicio"], how="left")
     )
 
+# Data de medias
+medias = pd.read_parquet("data/item_medias.parquet")
 
+conteo_grado = conteo_grado.merge(medias, how="inner", on=["item", "grado"])
+
+# Elementos unicos
 procesos = conteo_grado["proceso"].unique()
+campos   = conteo_grado["campo"].unique()
 
 #### Streamlit ####
 
@@ -82,28 +91,30 @@ tab_grado, tab_servicios = st.tabs(["Grado", "Servicios"])
 
 with tab_grado:
     with st.sidebar:
-        sel_cnt_nivel = st.selectbox("Nivel", options = NIVELES_GRADO.keys(), index=2)
-        sel_cnt_grado = st.selectbox("Grado", options = NIVELES_GRADO[sel_cnt_nivel])
+        sel_nivel = st.selectbox("Nivel", options = NIVELES_GRADO.keys(), index=2)
+        sel_grado = st.selectbox("Grado", options = NIVELES_GRADO[sel_nivel])
 
     conteo_grado_filtro = conteo_grado.loc[
-        (conteo_grado["nivel"] == sel_cnt_nivel) &
-        (conteo_grado["grado"] == sel_cnt_grado)
+        (conteo_grado["nivel"] == sel_nivel) &
+        (conteo_grado["grado"] == sel_grado)
     ].sort_values(["proceso", "consigna", "inciso", "criterio_num"])
 
     eia_filtro = conteo_grado_filtro["eia"].unique()
 
     with st.sidebar:
-        sel_cnt_eia = st.multiselect("EIA", options=eia_filtro, default=eia_filtro)
-        sel_cnt_proceso = st.multiselect("Proceso", options = procesos, default=procesos)
+        sel_eia = st.multiselect("EIA", options=eia_filtro, default=eia_filtro)
+        sel_proceso = st.multiselect("Proceso", options=procesos, default=procesos)
+        sel_campo = st.multiselect("Campo formativo", options=campos, default=campos)
 
     conteo_grado_filtro = conteo_grado_filtro.loc[
-        (conteo_grado_filtro["eia"].isin(sel_cnt_eia)) &
-        (conteo_grado_filtro["proceso"].isin(sel_cnt_proceso))
+        (conteo_grado_filtro["eia"].isin(sel_eia)) &
+        (conteo_grado_filtro["proceso"].isin(sel_proceso)) &
+        (conteo_grado_filtro["campo"].isin(sel_campo))
     ]
 
     orden = st.radio(
         "Ordenar por:",
-        ["Reactivo", "Campo", "Nivel 0", "Nivel 3"],
+        ["Reactivo", "Proceso", "Campo", "Nivel 0", "Nivel 3"],
         horizontal=True
         )
 
@@ -113,6 +124,8 @@ with tab_grado:
 
         if orden == "Reactivo":
             conteo_eia = conteo_eia.sort_values(["consigna", "inciso", "item"])
+        elif orden == "Proceso":
+            conteo_eia = conteo_eia.sort_values(["proceso", "item"])
         elif orden == "Campo":
             conteo_eia = conteo_eia.sort_values(["campo", "item"])
         elif orden == "Nivel 0":
@@ -120,40 +133,77 @@ with tab_grado:
         elif orden == "Nivel 3":
             conteo_eia = conteo_eia.sort_values(["nivel_3", "item"])
         
-        fig = px.bar(
-            conteo_eia,
-            x="item",
-            y="prop",
-            color="resp",
-            text=conteo_eia["prop"].round(),
-            color_discrete_sequence=COLORES,
-            hover_name="proceso",
-            hover_data=["eia", "descriptor", "criterio", "campo"],
-            labels={"prop":"Porcentaje", "item":"Criterio", "resp":"Respuesta"},
-            height=350,
-        )
-        fog = px.line(
-            conteo_eia,
-            x="item",
-            y="prop",
-            color="resp",
-            markers=True,
-            color_discrete_sequence=COLORES,
-            hover_name="proceso",
-            hover_data=["eia", "descriptor", "criterio", "campo"],
-            labels={"prop":"Porcentaje", "item":"Criterio", "resp":"Respuesta"},
-            height=350,
-        )
-        st.plotly_chart(fig)
-        st.plotly_chart(fog)
+        conteo_media = conteo_eia[["item", "media", "proceso"]].drop_duplicates()
+
+        plot_medias = make_subplots(
+            rows=2, cols=1,
+            shared_xaxes=True,
+            row_heights=[0.35, 0.65],
+            vertical_spacing=0,
+            )
+        plot_medias.add_trace(go.Scatter(
+            x=conteo_media["item"],
+            y=conteo_media["media"],
+            name="Media",
+            mode="lines+markers+text",
+            text=round(conteo_media["media"], 2),
+            hovertext=conteo_media["proceso"],
+            textposition="top center",
+            marker=dict(color="#999999"),
+            ),
+            row=1, col=1,
+            )
+        plot_medias.add_trace(
+            go.Bar(),
+            row=2, col=1,
+            )
+        for resp in conteo_eia["resp"].unique():
+            conteo_eia_resp = conteo_eia.loc[conteo_eia["resp"] == resp]
+            plot_medias.append_trace(go.Bar(
+                x=conteo_eia_resp["item"],
+                y=conteo_eia_resp["prop"],
+                name=resp,
+                text=round(conteo_eia_resp["prop"]),
+                insidetextanchor="middle",
+                marker=dict(color=COLORES_RESP[resp]),
+                ),
+                row=2, col=1,
+                )
+        plot_medias.update_yaxes(
+            title_text="Media", 
+            range=[.75, 2.25],
+            row=1, col=1,
+            )
+        plot_medias.update_yaxes(
+            title_text="Porcentaje", 
+            row=2, col=1,
+            )
+        plot_medias.update_layout(
+            barmode="stack",
+            height=500,
+            margin=dict(t=35, b=35),
+            )
+        st.plotly_chart(plot_medias)
+        if st.checkbox(
+            "Ver tabla de especificaciones.", 
+            value=False,
+            key=f"tabla_{eia}"
+            ):
+            st.table((
+                conteo_eia[["item", "proceso", "campo", "contenido", "pda", "descriptor", "criterio"]]
+                .drop_duplicates()
+                .reset_index(drop=True)
+            ))
+
+
 
 with tab_servicios:
     servicios = conteo_servicio["servicio"].unique()
     sel_servicio = st.multiselect("Tipo de servicio", options=servicios, default=servicios)
 
     conteo_servicio_filtro = conteo_servicio.loc[
-        (conteo_servicio["nivel"] == sel_cnt_nivel) &
-        (conteo_servicio["grado"] == sel_cnt_grado) &
+        (conteo_servicio["nivel"] == sel_nivel) &
+        (conteo_servicio["grado"] == sel_grado) &
         (conteo_servicio["servicio"].isin(sel_servicio))
         ]
     
