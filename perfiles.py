@@ -99,19 +99,31 @@ for eia in irt_filtro["eia"].unique():
         line_width=1,
         line_color="#858ae3"
         )
+    fig.update_xaxes(title_text="Criterios")
+    fig.update_yaxes(title_text="Dificultad")
+    fig.update_layout(
+        height=400,
+        margin=dict(t=30, b=15),
+    )
+    
     personas_cuantil = personas_eia.loc[personas_eia["puntaje"] <= float(sel_dif), ["cuantil", "puntaje"]].reset_index(drop=True)
     personas_cuantil["puntaje"] = personas_cuantil["puntaje"].round(3)
-    irt_cuantil = (
-        irt_eia.loc[
-            irt_eia["dificultad"].round(2) >= sel_dif, 
-            ["item", "resp", "dificultad", "proceso", "criterio", "descriptor", "campo"]
-            ]
-            .sort_values("dificultad")
-            .reset_index(drop=True)
-        )
+    #irt_cuantil = (
+    #    irt_eia.loc[
+    #        irt_eia["dificultad"].round(2) >= sel_dif, 
+    #        ["item", "resp", "dificultad", "proceso", "criterio", "descriptor", "campo"]
+    #        ]
+    #        .sort_values("dificultad")
+    #        .reset_index(drop=True)
+    #    )
+    irt_cuantil = irt_eia.sort_values("dificultad")
+    irt_cuantil["posicion"] = ["Arriba" if i >= sel_dif else "Abajo" for i in irt_cuantil["dificultad"]]
+    irt_cuantil = irt_cuantil[["item", "resp", "dificultad", "posicion", "proceso", "criterio", "descriptor", "campo"]]
+    
     st.markdown("### Dificultades de los criterios")
     st.plotly_chart(fig, key=eia)
     st.markdown("### Población debajo del punto de corte.")
     st.dataframe(personas_cuantil.iloc[-1])
-    st.markdown("### Criteros sobre el punto de corte.")
-    st.dataframe(irt_cuantil)
+    st.markdown("### Posición de los criterios respecto al punto de corte.")
+    posiciones = st.multiselect("Mostrar sólo criterios que están:", options=["Arriba", "Abajo"], default=["Arriba", "Abajo"])
+    st.dataframe(irt_cuantil.loc[irt_cuantil["posicion"].isin(posiciones)])
