@@ -13,6 +13,11 @@ COLORES_RESP = dict(zip(
     ["N0", "N1", "N2", "N3"], 
     ["#fcb1c3", "#ef476f", "#f5b700", "#008bf8"]
     ))
+COLUMNAS_TABLA = [
+    "item", "resp", "dificultad", "posicion", "criterio", "proceso", 
+    "campo", "descriptor"
+    ]
+
 
 # Diccionario de variables
 diccionario = pd.read_parquet("data/diccionario.parquet")
@@ -37,7 +42,7 @@ campos   = irt["campo"].unique()
 
 #### Streamlit ####
 st.set_page_config(
-    page_title="Conteos - Evaluación diagnóstica 2024",
+    page_title="Perfiles - Evaluación diagnóstica 2024",
     page_icon=":worm:",
     layout="wide",
 )
@@ -84,21 +89,35 @@ for eia in irt_filtro["eia"].unique():
         .values.round(2)
     )
     
-    sel_dif = st.select_slider(
-        "Corte",
-        options=dificultades,
-        key=f"slider_{eia}"
+    col_1, col_2 = st.columns([1, 4])
+    with col_1:
+        sel_dif = st.select_slider(
+            "Punto de corte",
+            options=dificultades,
+            key=f"slider_{eia}"
+            )
+    personas_cuantil = (
+        personas_eia
+        .loc[personas_eia["puntaje"] <= float(sel_dif), ["cuantil", "puntaje"]]
+        .reset_index(drop=True)
         )
-    sel_texto = st.radio(
-        "Texto para mostrar.", 
-        options=["Dificultad", "Proceso", "Campo formativo"],
-        horizontal=True,
-        key=f"texto_{eia}",
+    personas_cuantil["puntaje"] = personas_cuantil["puntaje"].round(3)
+    cuantil = personas_cuantil.iloc[-1]["cuantil"]
+
+    with col_1:
+        st.metric("Personas debajo del corte.", value=cuantil)
+    with col_1:
+        sel_texto = st.radio(
+            "Texto para mostrar.", 
+            options=["Dificultad", "Proceso", "Campo formativo"],
+            key=f"texto_{eia}",
         )
-    if sel_texto == "Campo formativo":
-        sel_texto = "campo_clave"
-    else:
-        sel_texto = sel_texto.lower()
+        if sel_texto == "Campo formativo":
+            sel_texto = "campo_clave"
+        else:
+            sel_texto = sel_texto.lower()
+    with col_1:
+        rango_completo = st.checkbox("Rango de puntajes", key=f"sel_rango{eia}")
     
     fig = go.Figure()
     fig.add_hline(
@@ -118,23 +137,35 @@ for eia in irt_filtro["eia"].unique():
             hovertext=irt_resp["criterio"],
             marker=dict(color=COLORES_RESP[resp])
         ))
-        fig.update_xaxes(title_text="Criterios")
-        fig.update_yaxes(title_text="Dificultad")
-        fig.update_layout(
-            height=400,
-            margin=dict(t=30, b=15),
-        )
+    fig.update_xaxes(title_text="Criterios")
+    fig.update_yaxes(title_text="Dificultad")
+    if rango_completo:
+        fig.update_yaxes(
+            range=[
+                personas_eia["puntaje"].min(), 
+                personas_eia["puntaje"].max()
+                ]
+            )
+    fig.update_layout(
+        height=400,
+        margin=dict(t=30, b=15),
+    )
     
-    personas_cuantil = personas_eia.loc[personas_eia["puntaje"] <= float(sel_dif), ["cuantil", "puntaje"]].reset_index(drop=True)
-    personas_cuantil["puntaje"] = personas_cuantil["puntaje"].round(3)
     irt_cuantil = irt_eia.sort_values("dificultad")
     irt_cuantil["posicion"] = ["Arriba" if i >= sel_dif else "Abajo" for i in irt_cuantil["dificultad"]]
-    irt_cuantil = irt_cuantil[["item", "resp", "dificultad", "posicion", "proceso", "criterio", "descriptor", "campo"]]
+    irt_cuantil = irt_cuantil[COLUMNAS_TABLA]    
+
+    with col_2:
+        st.plotly_chart(fig, key=eia)
     
-    st.markdown("### Dificultades de los criterios")
-    st.plotly_chart(fig, key=eia)
-    st.markdown("### Población debajo del punto de corte.")
-    st.dataframe(personas_cuantil.iloc[-1])
+    persona_tabla = personas_eia
+    persona_tabla["puntaje"] = persona_tabla["puntaje"].round(2)
+    persona_tabla = persona_tabla[["cuantil", "puntaje"]].reset_index(drop=True).transpose()
+    st.table(persona_tabla)
     st.markdown("### Posición de los criterios respecto al punto de corte.")
-    posiciones = st.multiselect("Mostrar sólo criterios que están:", options=["Arriba", "Abajo"], default=["Arriba", "Abajo"], key=f"posicion_{eia}")
+    posiciones = st.multiselect(
+        "Mostrar sólo criterios que están:",
+        options=["Arriba", "Abajo"],
+        default=["Arriba", "Abajo"], key=f"posicion_{eia}"
+        )
     st.dataframe(irt_cuantil.loc[irt_cuantil["posicion"].isin(posiciones)])
