@@ -100,42 +100,33 @@ for eia in irt_filtro["eia"].unique():
         .values.round(2)
     )
     
-    col_1, col_2 = st.columns([1, 4])
+    col_1, col_2 = st.columns([0.7, 0.3])
     with col_1:
         sel_dif = st.select_slider(
             "Punto de corte",
             options=dificultades,
             key=f"slider_{eia}"
             )
-    personas_cuantil = (
-        personas_eia
-        .loc[personas_eia["puntaje"] <= float(sel_dif), ["cuantil", "puntaje"]]
-        .reset_index(drop=True)
-        )
-    personas_cuantil["puntaje"] = personas_cuantil["puntaje"].round(3)
-    cuantil = personas_cuantil.iloc[-1]["cuantil"]
-
-    with col_1:
+        if sel_dif < 0:
+            sel_dif = 0 
+    with col_2:
+        personas_cuantil = (
+            personas_eia
+            .loc[personas_eia["puntaje"] <= float(sel_dif), ["cuantil", "puntaje"]]
+            .reset_index(drop=True)
+            )
+        personas_cuantil["puntaje"] = personas_cuantil["puntaje"].round(3)
+        cuantil = personas_cuantil.iloc[-1]["cuantil"]
         st.metric("Personas debajo del corte.", value=cuantil)
-    with col_1:
-        sel_texto = st.radio(
-            "Texto para mostrar.", 
-            options=["Dificultad", "Proceso", "Campo formativo"],
-            key=f"texto_{eia}",
-        )
-        if sel_texto == "Campo formativo":
-            sel_texto = "campo_clave"
-        else:
-            sel_texto = sel_texto.lower()
-    with col_1:
-        rango_completo = st.checkbox("Rango de puntajes", key=f"sel_rango{eia}")
     
-    fig = go.Figure()
-    fig.add_hline(
-        y=sel_dif,
-        line_width=1.5,
-        line_color=COLOR_LINEA,
+    fig = make_subplots(
+        rows=1, cols=2,
+        column_widths=[0.75, 0.25],
+        subplot_titles=["Items", "Personas"],
+        shared_yaxes=True,
+        horizontal_spacing=0,
         )
+
     for resp in irt_eia["resp"].unique():
         irt_resp = irt_eia.loc[irt_eia["resp"] == resp]
         fig.add_trace(go.Scatter(
@@ -143,60 +134,71 @@ for eia in irt_filtro["eia"].unique():
             y=irt_resp["dificultad"],
             name=resp,
             mode="markers+text",
-            text= round(irt_resp[sel_texto], 2),
+            text= irt_resp["dificultad"].round().astype(str),
             textposition="top center",
-            hovertext=irt_resp["criterio"],
+            hovertext= (
+                irt_resp["criterio"].astype(str) + 
+                "<br>" + 
+                irt_resp["proceso"].astype("str") + 
+                "<br>" + 
+                irt_resp["campo"].astype("str")
+                ),
             marker=dict(color=COLORES_RESP[resp])
-        ))
-    fig.update_xaxes(title_text="Criterios")
+        ),
+        row=1, col=1)
+    fig.update_xaxes(title_text="Criterios",
+    row=1, col=1)
     fig.update_yaxes(title_text="Dificultad")
-    if rango_completo:
-        fig.update_yaxes(
-            range=[
-                personas_eia["puntaje"].min(), 
-                personas_eia["puntaje"].max()
-                ]
-            )
-    fig.update_layout(
-        height=400,
-        margin=dict(t=30, b=15),
-    )
-    
-    hist = go.Figure(go.Bar(
-        x=personas_dist_eia["dificultad"],
-        y=personas_dist_eia["conteo"],
-        marker=dict(color=COLOR_BARRA)
-    ))
-    hist.add_vline(
-        x=sel_dif,
+    fig.add_trace(go.Bar(
+        x=personas_dist_eia["conteo"],
+        y=personas_dist_eia["dificultad"],
+        marker=dict(color=COLOR_BARRA),
+        orientation="h",
+        showlegend=False,
+        ),
+        row=1, col=2
+        )
+    fig.add_hline(
+        y=sel_dif,
         line_width=1.5,
         line_color=COLOR_LINEA,
+        row=1, col=2
         )
-    hist.update_layout(
+    fig.add_hline(
+        y=sel_dif,
+        line_width=1.5,
+        line_color=COLOR_LINEA,
+        row=1, col=1,
+        )
+    fig.update_layout(
         barmode="group",
         bargap=0.0,
-        height=235,
-        margin=dict(t=15, b=15)
+        height=500,
+        margin=dict(t=25, b=15),
     )
-    hist.update_xaxes(title_text="Habilidad")
-    hist.update_yaxes(title_text="Conteo")
+    fig.update_xaxes(title_text="Conteo", row=1, col=2)
+    fig.update_yaxes(title_text="Habilidad", side="right", row=1, col=2)
 
-    with col_2:
-        st.plotly_chart(fig, key=eia)
-        st.plotly_chart(hist)
-
+    #with col_2:
+    st.plotly_chart(fig, key=eia)
+    
     irt_cuantil = irt_eia.sort_values("dificultad")
     irt_cuantil["posicion"] = ["Arriba" if i >= sel_dif else "Abajo" for i in irt_cuantil["dificultad"]]
     irt_cuantil = irt_cuantil[COLUMNAS_TABLA]    
-
+    
     persona_tabla = personas_eia
     persona_tabla["puntaje"] = persona_tabla["puntaje"].round(2)
     persona_tabla = persona_tabla[["cuantil", "puntaje"]].reset_index(drop=True).transpose()
-    #st.table(persona_tabla)
-    st.markdown("### Posición de los criterios respecto al punto de corte.")
-    posiciones = st.multiselect(
-        "Mostrar sólo criterios que están:",
-        options=["Arriba", "Abajo"],
-        default=["Arriba", "Abajo"], key=f"posicion_{eia}"
-        )
-    st.dataframe(irt_cuantil.loc[irt_cuantil["posicion"].isin(posiciones)])
+
+    if st.checkbox("Mostrar tabla de criterios.", value=False, key=f"check_tabla_{eia}"):
+        st.markdown("### Posición de los criterios respecto al punto de corte.")
+        posiciones = st.multiselect(
+            "Mostrar sólo criterios que están:",
+            options=["Arriba", "Abajo"],
+            default=["Arriba", "Abajo"], key=f"posicion_{eia}"
+            )
+        st.dataframe(irt_cuantil.loc[irt_cuantil["posicion"].isin(posiciones)])
+        
+    if st.checkbox("Mostrar cuantiles de personas.", value=False, key=f"check_tabla_persona_{eia}"):
+        st.markdown("### Cuantiles de habilidades de las personas.")
+        st.table(persona_tabla)
