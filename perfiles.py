@@ -17,6 +17,8 @@ COLUMNAS_TABLA = [
     "item", "resp", "dificultad", "posicion", "criterio", "proceso", 
     "campo", "descriptor"
     ]
+COLOR_LINEA = "#9b5de5"
+COLOR_BARRA = "#bfd3c1"
 
 
 # Diccionario de variables
@@ -34,6 +36,7 @@ irt = irt.merge(diccionario, how="inner", on=["item"])
 
 # data_personas
 personas = pd.read_parquet("data/personas.parquet")
+personas_dist = pd.read_parquet("data/personas_dist.parquet")
 
 # Elementos unicos
 procesos = irt["proceso"].unique()
@@ -62,6 +65,10 @@ personas_filtro = personas.loc[
     (personas["nivel"] == sel_nivel) &
     (personas["grado"] == sel_grado)
     ]
+personas_dist_filtro = personas_dist.loc[
+    (personas_dist["nivel"] == sel_nivel) &
+    (personas_dist["grado"] == sel_grado)
+]
 eia_filtro = irt_filtro["eia"].unique()
 
 with st.sidebar:
@@ -77,11 +84,15 @@ irt_filtro = irt_filtro.loc[
 personas_filtro = personas_filtro[(
     personas_filtro["eia"].isin(sel_eia)
     )]
+personas_dist_filtro = personas_dist_filtro[(
+    personas_dist_filtro["eia"].isin(sel_eia)
+    )]
 
 for eia in irt_filtro["eia"].unique():
     st.markdown(f"## {eia}")
     irt_eia = irt_filtro.loc[irt_filtro["eia"] == eia]
     personas_eia = personas_filtro[personas_filtro["eia"] == eia]
+    personas_dist_eia = personas_dist_filtro[personas_dist_filtro["eia"] == eia]
     dificultades = (
         irt_eia
         .sort_values("dificultad")
@@ -122,8 +133,8 @@ for eia in irt_filtro["eia"].unique():
     fig = go.Figure()
     fig.add_hline(
         y=sel_dif,
-        line_width=1,
-        line_color="#858ae3"
+        line_width=1.5,
+        line_color=COLOR_LINEA,
         )
     for resp in irt_eia["resp"].unique():
         irt_resp = irt_eia.loc[irt_eia["resp"] == resp]
@@ -151,17 +162,37 @@ for eia in irt_filtro["eia"].unique():
         margin=dict(t=30, b=15),
     )
     
+    hist = go.Figure(go.Bar(
+        x=personas_dist_eia["dificultad"],
+        y=personas_dist_eia["conteo"],
+        marker=dict(color=COLOR_BARRA)
+    ))
+    hist.add_vline(
+        x=sel_dif,
+        line_width=1.5,
+        line_color=COLOR_LINEA,
+        )
+    hist.update_layout(
+        barmode="group",
+        bargap=0.0,
+        height=235,
+        margin=dict(t=15, b=15)
+    )
+    hist.update_xaxes(title_text="Habilidad")
+    hist.update_yaxes(title_text="Conteo")
+
+    with col_2:
+        st.plotly_chart(fig, key=eia)
+        st.plotly_chart(hist)
+
     irt_cuantil = irt_eia.sort_values("dificultad")
     irt_cuantil["posicion"] = ["Arriba" if i >= sel_dif else "Abajo" for i in irt_cuantil["dificultad"]]
     irt_cuantil = irt_cuantil[COLUMNAS_TABLA]    
 
-    with col_2:
-        st.plotly_chart(fig, key=eia)
-    
     persona_tabla = personas_eia
     persona_tabla["puntaje"] = persona_tabla["puntaje"].round(2)
     persona_tabla = persona_tabla[["cuantil", "puntaje"]].reset_index(drop=True).transpose()
-    st.table(persona_tabla)
+    #st.table(persona_tabla)
     st.markdown("### Posición de los criterios respecto al punto de corte.")
     posiciones = st.multiselect(
         "Mostrar sólo criterios que están:",
