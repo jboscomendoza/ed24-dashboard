@@ -12,6 +12,10 @@ NIVELES_GRADO = {
     }
 COLORES = ["#fcb1c3", "#fce397", "#bae673", "#a4dafc"]
 COLORES_RESP = dict(zip(["N0", "N1", "N2", "N3"], COLORES))
+COLORES_SERVICIO = dict(zip(
+    ["Nacional", "General", "Privada", "Técnica", "Telesecundaria"],
+    ["#ffadad", "#fcf6bd", "#d0f4de", "#a9def9", "#e4c1f9"]
+))
 
 COLS_INFORMACION = ["campo", "contenido", "pda", "descriptor", "criterio"]
 
@@ -34,7 +38,7 @@ conteo_grado["resp"] = (
     .reorder_categories(["N0", "N1", "N2", "N3"], ordered=True)
 )
 
-conteo_grado = conteo_grado.sort_values(["grado", "eia_clave"])
+conteo_grado = conteo_grado.sort_values(["grado", "eia_clave", "proceso"])
 
 conteo_grado["consigna"] = conteo_grado["consigna"].astype("int").astype("string")
 conteo_grado["grado"] = conteo_grado["grado"].astype("int").astype("string")
@@ -163,3 +167,40 @@ for proceso in sel_proceso:
             .reset_index(drop=True)
             )
         st.table(conteo_criterio)
+
+
+comp = conteo_grado.loc[conteo_grado["eia"] == sel_eia]
+criterios_comp = comp["criterio"].unique()
+grados_comp = comp["grado"].unique()
+    
+st.markdown("## Comparativos")
+if st.checkbox("Mostrar comparativos."):
+    sel_grado = st.selectbox("Grado", options=grados_comp)
+    for criterio in criterios_comp:
+        st.markdown(f"### {criterio}")
+        comp_criterio = comp.loc[(comp["criterio"] == criterio) & (comp["grado"] == sel_grado)]
+        fig_crit = go.Figure()
+        for servicio in servicios:
+            comp_serv = comp_criterio.loc[comp_criterio["servicio"] == servicio]
+            fig_crit.add_trace(go.Bar(
+                x=comp_serv["resp"],
+                y=comp_serv["prop"],
+                text=round(comp_serv["prop"], 1),
+                name=servicio,
+                marker=dict(color=COLORES_SERVICIO[servicio]),
+            ))
+        fig_crit.update_xaxes(
+            title="Nivel",
+        )
+        fig_crit.update_yaxes(
+            title="Porcentaje",
+        )
+        fig_crit.update_layout(
+            margin=dict(t=20, b=20),
+            height=250,
+            font=dict(
+                family="Noto Sans",
+                size=13
+                ),
+            )
+        st.plotly_chart(fig_crit, key=f"comp_fig_{criterio}")
