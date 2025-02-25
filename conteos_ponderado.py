@@ -19,11 +19,12 @@ diccionario = pd.read_parquet("data/diccionario.parquet")
 diccionario = diccionario.drop(["fase", "nivel", "grado"], axis=1)
 rubrica     = pd.read_parquet("data/diccionario_rubrica.parquet")
 
-conteo_grado = pd.read_parquet("data/item_conteo_grado.parquet")
+conteo_grado = pd.read_parquet("data/item_conteo_ponderado.parquet")
 conteo_grado = (
     conteo_grado
     .merge(diccionario, how="inner", on="item")
     .merge(rubrica, how="inner", on=["item", "resp"])
+    .drop_duplicates()
     )
 
 conteo_grado["resp"] = (
@@ -33,26 +34,10 @@ conteo_grado["resp"] = (
     .reorder_categories(["N0", "N1", "N2", "N3"], ordered=True)
 )
 
+conteo_grado = conteo_grado.sort_values(["grado", "eia_clave"])
+
 conteo_grado["consigna"] = conteo_grado["consigna"].astype("int").astype("string")
 conteo_grado["grado"] = conteo_grado["grado"].astype("int").astype("string")
-
-
-nivel_0 = (
-    conteo_grado
-    .loc[conteo_grado["resp"] == "N0"][["item", "grado", "prop"]]
-    .rename(columns={"prop":"nivel_0"})
-    )
-nivel_3 = (
-    conteo_grado
-    .loc[conteo_grado["resp"] == "N3"][["item", "grado", "prop"]]
-    .rename(columns={"prop":"nivel_3"})
-    )
-conteo_grado = (
-    conteo_grado
-    .merge(nivel_0, on=["item", "grado"], how="left")
-    .merge(nivel_3, on=["item", "grado"], how="left")
-    )
-
 
 #### Streamlit ####
 
@@ -63,9 +48,10 @@ st.set_page_config(
 )
 
 with st.sidebar:
-    niveles = conteo_grado["nivel"].unique()
-    sel_nivel = st.selectbox("Nivel", options=niveles, index=2)
-    conteo_filtro = conteo_grado.loc[conteo_grado["nivel"] == sel_nivel]
+    st.markdown("### Únicamente fase 6")
+    servicios = conteo_grado["servicio"].unique()
+    sel_servicio = st.selectbox("Servicio", options=servicios, index=2)
+    conteo_filtro = conteo_grado.loc[conteo_grado["servicio"] == sel_servicio]
 
     eias = conteo_filtro["eia"].unique()
     sel_eia = st.selectbox("EIA", options=eias)
