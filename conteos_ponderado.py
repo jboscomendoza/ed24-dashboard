@@ -131,6 +131,22 @@ for proceso in sel_proceso:
         )
     st.plotly_chart(figura, use_container_width=False)
 
+    if st.checkbox("Mostrar tabla de datos.", key=f"tabla_datos_{criterio}"):
+        st.markdown(f"### Tabla de datos")
+        tabla_prop = (
+            conteo_proceso
+            .round({"prop":1})
+            .pivot_table(
+                index=["criterio", "grado"],
+                columns="resp",
+                values="prop",
+                observed=True,
+                )
+            .reset_index(names=["criterio", "grado"])
+            .rename(columns=str.title)
+            )
+        st.dataframe(tabla_prop)
+
     if st.checkbox(
         "Mostrar información del proceso.",
         key=f"check_info_{proceso}"):
