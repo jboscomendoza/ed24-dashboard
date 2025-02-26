@@ -74,8 +74,16 @@ for proceso in sel_proceso:
     
     criterios = conteo_proceso["criterio"].unique()
     num_criterios = len(criterios)
-    nom_criterios = [i[0:70]+"..." if len(i)>70 else i for i in criterios]
-    nom_criterios = ["<br>".join(wrap(i, 20)) for i in nom_criterios]
+    nom_criterios = [
+        "<br>".join(wrap(i, width = 16, max_lines=4, placeholder="...")) 
+        for i in criterios
+        ]
+    
+    if num_grados > 1:
+        ancho_col = 80
+    else:
+        ancho_col = 90
+    ancho_plot = (ancho_col * num_grados * num_criterios) + 100
 
     figura = make_subplots(
         rows=1, 
@@ -88,7 +96,9 @@ for proceso in sel_proceso:
         )
     for id_criterio in range(num_criterios):
         criterio = criterios[id_criterio]
-        conteo_criterio = conteo_proceso.loc[conteo_proceso["criterio"] == criterio]
+        conteo_criterio = conteo_proceso.loc[
+            conteo_proceso["criterio"] == criterio
+            ]
 
         for resp in conteo_criterio["resp"].unique():
             conteo_resp = conteo_criterio.loc[conteo_criterio["resp"] == resp]
@@ -98,7 +108,11 @@ for proceso in sel_proceso:
                 name=resp,
                 legendgroup="group",
                 text=round(conteo_resp["prop"], 1),
-                hovertext=conteo_resp["campo"]+"<br>Consigna "+conteo_resp["consigna"]+"<br>Inciso "+conteo_resp["inciso"],
+                hovertext=conteo_resp["campo"] + 
+                    "<br>Consigna " + 
+                    conteo_resp["consigna"] + 
+                    "<br>Inciso " + 
+                    conteo_resp["inciso"],
                 insidetextanchor="middle",
                 marker=dict(color=COLORES_RESP[resp],),
                 ),
@@ -116,17 +130,17 @@ for proceso in sel_proceso:
         title="",
     )
     figura.update_annotations(
-        font_size=13,
+        font_size=14,
         font_family="Noto Sans Condensed, sans",
     )
     figura.update_layout(
         barmode="stack",
-        height=425,
-        width=(110*num_grados*num_criterios) + 110,
+        height=450,
+        width=ancho_plot,
         margin=dict(b=30),
         font=dict(
-            family="Noto Sans",
-            size=13
+            family="Noto Sans Condensed",
+            size=14
             ),
         )
     st.plotly_chart(figura, use_container_width=False)
@@ -187,7 +201,6 @@ for proceso in sel_proceso:
             .reset_index(drop=True)
             )
         st.table(conteo_criterio)
-
 
 comp = conteo_grado.loc[conteo_grado["eia"] == sel_eia]
 criterios_comp = comp["criterio"].unique()
