@@ -54,7 +54,7 @@ st.set_page_config(
 with st.sidebar:
     st.markdown("### Únicamente fase 6")
     servicios = conteo_grado["servicio"].unique()
-    sel_servicio = st.selectbox("Servicio", options=servicios, index=2)
+    sel_servicio = st.selectbox("Servicio", options=servicios, index=0)
     conteo_filtro = conteo_grado.loc[conteo_grado["servicio"] == sel_servicio]
 
     eias = conteo_filtro["eia"].unique()
@@ -69,7 +69,9 @@ st.title(f"{sel_eia}")
 for proceso in sel_proceso:
     conteo_proceso = conteo_filtro.loc[conteo_filtro["proceso"] == proceso]
     st.markdown(f"## {proceso}")
-
+    
+    num_grados = len(conteo_proceso["grado"].unique())
+    
     criterios = conteo_proceso["criterio"].unique()
     num_criterios = len(criterios)
     nom_criterios = [i[0:70]+"..." if len(i)>70 else i for i in criterios]
@@ -96,7 +98,7 @@ for proceso in sel_proceso:
                 name=resp,
                 legendgroup="group",
                 text=round(conteo_resp["prop"], 1),
-                hovertext=conteo_resp["campo"],
+                hovertext=conteo_resp["campo"]+"<br>Consigna "+conteo_resp["consigna"]+"<br>Inciso "+conteo_resp["inciso"],
                 insidetextanchor="middle",
                 marker=dict(color=COLORES_RESP[resp],),
                 ),
@@ -120,7 +122,7 @@ for proceso in sel_proceso:
     figura.update_layout(
         barmode="stack",
         height=425,
-        width=180*num_criterios,
+        width=(110*num_grados*num_criterios) + 110,
         margin=dict(b=30),
         font=dict(
             family="Noto Sans",
@@ -152,13 +154,15 @@ for proceso in sel_proceso:
         st.markdown(f"### Niveles de la rúbrica")
         sel_criterios = st.selectbox("Criterio",options=criterios, index=0)
         conteo_criterio = (
-            conteo_proceso[["resp", "resp_rubrica"]]
+            conteo_proceso[["consigna", "inciso", "resp", "resp_rubrica"]]
             .loc[
                 (conteo_proceso["criterio"] == sel_criterios) &
                 (conteo_proceso["resp"]!="N0")
                 ]
             .drop_duplicates()
             .rename(columns={
+                "consigna":"Consigna",
+                "inciso":"Inciso",
                 "criterio":"Criterio",
                 "resp":"Nivel",
                 "resp_nivel":"Descripcion",
