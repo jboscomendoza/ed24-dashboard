@@ -12,8 +12,8 @@ NIVELES_GRADO = {
 
 COLORES = ["#8338ec", "#ffca3a", "#8ac926", "#1982c4", "#cccccc"]
 PROCESOS = [
-    "Recuperación de información", "Comprensión", "Análisis", 
-    "Utilización del conocimiento", "No definido"
+    "Comprensión", "Utilización del conocimiento", 
+    "Propuesta de solución", "Juicio crítico", "No definido"
     ]
 COLORES_PROCESO = dict(zip(PROCESOS, COLORES))
 
@@ -97,7 +97,10 @@ for eia in medias_filtro["eia"].unique():
             hovertext=medias_proceso["campo"],
             ))
     figura.update_yaxes(range=limites_y)
+    figura.update_layout(
+        margin=dict(t=20),
+    )
     st.plotly_chart(figura)
-    campos_eia = medias_filtro_eia["campo"].unique()
-    st.dataframe(medias_filtro_eia[["item", "proceso", "media", "campo", "pda", "descriptor", "criterio"]])
+    if st.checkbox("Mostrar información", key=f"check_tabla_{eia}"):
+        st.dataframe(medias_filtro_eia[["item", "proceso", "media", "campo", "pda", "descriptor", "criterio"]])
 

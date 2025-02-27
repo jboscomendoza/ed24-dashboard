@@ -188,7 +188,6 @@ for eia in irt_filtro["eia"].unique():
         key=f"check_tabla_{eia}"
         ):
         irt_cuantil = irt_eia.sort_values("dificultad")
-        irt_cuantil = irt_cuantil[COLUMNAS_TABLA]
         irt_cuantil.loc[:,"posicion"] = ["Arriba" if i >= sel_dif else "Abajo" for i in irt_cuantil["dificultad"]]
         st.markdown("### Posición de los criterios respecto al punto de corte.")
         posiciones = st.multiselect(
@@ -196,6 +195,7 @@ for eia in irt_filtro["eia"].unique():
             options=["Arriba", "Abajo"],
             default=["Arriba", "Abajo"], key=f"posicion_{eia}"
             )
+        irt_cuantil = irt_cuantil[COLUMNAS_TABLA]
         st.dataframe(irt_cuantil.loc[irt_cuantil["posicion"].isin(posiciones)])
     # Tabla de cuantiles de personas
     if st.checkbox(

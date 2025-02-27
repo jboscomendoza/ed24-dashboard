@@ -14,7 +14,8 @@ COLORES_RESP = dict(zip(
     ["#fcb1c3", "#fce397", "#bae673", "#a4dafc"]
     ))
 COLORES_PROCESO = dict(zip(
-    ["Recuperación de información", "Comprensión", "Análisis", "Utilización del conocimiento", "No definido"], 
+    ["Recuperación de información", "Comprensión", "Análisis", 
+     "Utilización del conocimiento", "No definido"], 
     ["#8338ec", "#ffca3a", "#8ac926", "#1982c4", "#cccccc"]
     ))
 
