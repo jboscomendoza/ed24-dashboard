@@ -9,6 +9,7 @@ pages = {
         st.Page("medias.py",  title="Medias"),
         st.Page("irt.py",     title="IRT"),
         st.Page("perfiles.py", title="Perfiles"),
+        st.Page("perfiles_uni.py", title="Perfiles unidimensional"),
         #st.Page("items.py",   title="Items"),
     ]
 }
