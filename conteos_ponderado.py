@@ -11,7 +11,15 @@ NIVELES_GRADO = {
     "Secundaria": [1, 2, 3],
     }
 COLORES = ["#fcb1c3", "#fce397", "#bae673", "#a4dafc"]
-COLORES_RESP = dict(zip(["N0", "N1", "N2", "N3"], COLORES))
+CLAVE_RESP = ["N0", "N1", "N2", "N3"]
+DESC_RESP = [
+    "Sin evidencias de desarrollo<br>del aprendizaje",
+    "Requiere apoyo para desarrollar<br>el aprendizaje",
+    "En proceso de desarrollo",
+    "Aprendizaje desarrollado",
+    ]
+#DESC_RESP = ["<br>".join(wrap(i, width=16)) for i in DESC_RESP]
+COLORES_RESP = dict(zip(DESC_RESP, COLORES))
 COLORES_SERVICIO = dict(zip(
     ["Nacional", "General", "Privada", "Técnica", "Telesecundaria"],
     ["#ffadad", "#fcf6bd", "#d0f4de", "#a9def9", "#e4c1f9"]
@@ -31,11 +39,13 @@ conteo_grado = (
     .drop_duplicates()
     )
 
+conteo_grado["resp"] = conteo_grado["resp"].replace(CLAVE_RESP, DESC_RESP)
+
 conteo_grado["resp"] = (
     conteo_grado["resp"]
     .astype("category")
     .cat
-    .reorder_categories(["N0", "N1", "N2", "N3"], ordered=True)
+    .reorder_categories(DESC_RESP, ordered=True)
 )
 
 conteo_grado = conteo_grado.sort_values(["grado", "eia_clave", "proceso"])
@@ -66,6 +76,7 @@ with st.sidebar:
     conteo_filtro = conteo_filtro.loc[conteo_filtro["proceso"].isin(sel_proceso)]
 
 st.title(f"{sel_eia}")
+
 for proceso in sel_proceso:
     conteo_proceso = conteo_filtro.loc[conteo_filtro["proceso"] == proceso]
     st.markdown(f"## {proceso}")
@@ -74,16 +85,18 @@ for proceso in sel_proceso:
     
     criterios = conteo_proceso["criterio"].unique()
     num_criterios = len(criterios)
-    nom_criterios = [
-        "<br>".join(wrap(i, width = 16, max_lines=4, placeholder="...")) 
-        for i in criterios
-        ]
     
     if num_grados > 1:
-        ancho_col = 80
+        ancho_col = 70
+        ancho_lab = 24
     else:
-        ancho_col = 90
-    ancho_plot = (ancho_col * num_grados * num_criterios) + 100
+        ancho_col = 80
+        ancho_lab = 18
+    ancho_plot = (ancho_col * num_grados * num_criterios) + 70
+    nom_criterios = [
+        "<br>".join(wrap(i, width = ancho_lab, max_lines=3, placeholder="...")) 
+        for i in criterios
+        ]
 
     figura = make_subplots(
         rows=1, 
@@ -106,7 +119,8 @@ for proceso in sel_proceso:
                 x=conteo_resp["grado"].astype("string"),
                 y=conteo_resp["prop"],
                 name=resp,
-                legendgroup="group",
+                #legendgroup="group",
+                showlegend=False,
                 text=round(conteo_resp["prop"], 1),
                 hovertext=conteo_resp["campo"] + 
                     "<br>Consigna " + 
@@ -118,10 +132,10 @@ for proceso in sel_proceso:
                 ),
                 row=1, col=id_criterio+1
                 )
-            if id_criterio != num_criterios-1:
-                figura.update_traces(
-                    showlegend=False,
-                )
+            #if id_criterio != num_criterios-1:
+            #    figura.update_traces(
+            #        showlegend=False,
+            #    )
     figura.update_xaxes(
         title="",
         type="category",
@@ -130,18 +144,25 @@ for proceso in sel_proceso:
         title="",
     )
     figura.update_annotations(
-        font_size=14,
+        font_size=12,
         font_family="Noto Sans Condensed, sans",
     )
     figura.update_layout(
         barmode="stack",
-        height=450,
+        height=400,
         width=ancho_plot,
-        margin=dict(b=30),
+        margin=dict(t=60, b=25),
         font=dict(
             family="Noto Sans Condensed",
-            size=14
+            size=12
             ),
+        legend_font_size=11,
+        legend_font_family="Noto Sans Condensed",
+        legend=dict(
+            yref="container",
+            y=1.1,
+            orientation="h",
+        ),
         )
     st.plotly_chart(figura, use_container_width=False)
 
