@@ -246,7 +246,7 @@ st.markdown("## Comparativos")
 if st.checkbox("Mostrar comparativos."):
     sel_grado = st.selectbox("Grado", options=grados_comp)
     for criterio in criterios_comp:
-        st.markdown(f"### {criterio}")
+        st.markdown(f"### {criterio}", unsafe_allow_html=True)
         comp_criterio = comp.loc[
             (comp["criterio"] == criterio) & (comp["grado"] == sel_grado)
         ]
