@@ -19,8 +19,8 @@ COLORES_CAMPO = {
 }
 CLAVE_RESP = ["N0", "N1", "N2", "N3"]
 DESC_RESP = [
-    "Sin evidencias de desarrollo<br>del aprendizaje",
-    "Requiere apoyo para desarrollar<br>el aprendizaje",
+    "Sin evidencias de desarrollo del aprendizaje",
+    "Requiere apoyo para desarrollar el aprendizaje",
     "En proceso de desarrollo",
     "Aprendizaje desarrollado",
 ]
@@ -33,7 +33,7 @@ COLORES_SERVICIO = dict(
     )
 )
 
-COLS_INFORMACION = ["campo", "contenido", "pda", "descriptor", "criterio"]
+COLS_INFORMACION = ["campo", "contenido", "pda", "descriptor", "criterio_titulo"]
 
 diccionario = pd.read_parquet("data/diccionario.parquet")
 diccionario = diccionario.drop(["fase", "nivel", "grado"], axis=1)
@@ -64,6 +64,7 @@ conteo_grado["campo_color"] = [
     f'<span style="color:{COLORES_CAMPO[i]};">{i}</span><br>'
     for i in conteo_grado["campo_clave"]
 ]
+conteo_grado["criterio_titulo"] = conteo_grado["criterio"]
 conteo_grado["criterio"] = conteo_grado["campo_color"] + conteo_grado["criterio"]
 
 #### Streamlit ####
@@ -188,15 +189,16 @@ for proceso in sel_proceso:
         tabla_prop = (
             conteo_proceso.round({"prop": 1})
             .pivot_table(
-                index=["criterio", "grado"],
+                index=["criterio_titulo", "grado"],
                 columns="resp",
                 values="prop",
                 observed=True,
             )
-            .reset_index(names=["criterio", "grado"])
-            .rename(columns=str.title)
+            .reset_index(names=["criterio_titulo", "grado"])
+            .rename(columns=str.capitalize)
         )
         st.dataframe(tabla_prop)
+        st.table(tabla_prop)
 
     if st.checkbox("Mostrar información del proceso.", key=f"check_info_{proceso}"):
         st.markdown("### Información del proceso")
@@ -216,11 +218,12 @@ for proceso in sel_proceso:
 
     if st.checkbox("Mostrar niveles de la rúbrica.", key=f"check_rubrica_{proceso}"):
         st.markdown("### Niveles de la rúbrica")
-        sel_criterios = st.selectbox("Criterio", options=criterios, index=0)
+        criterios_titulo = conteo_proceso["criterio_titulo"].unique()
+        sel_criterios = st.selectbox("Criterio", options=criterios_titulo, index=0)
         conteo_criterio = (
             conteo_proceso[["consigna", "inciso", "resp", "resp_rubrica"]]
             .loc[
-                (conteo_proceso["criterio"] == sel_criterios)
+                (conteo_proceso["criterio_titulo"] == sel_criterios)
                 & (conteo_proceso["resp"] != "N0")
             ]
             .drop_duplicates()
