@@ -1,8 +1,12 @@
 import pyarrow
 import streamlit as st
 import pandas as pd
+import polars as pl
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
+
+
 
 NIVELES_GRADO = {
     "Preescolar": [3],
@@ -25,49 +29,6 @@ COLORES_PROCESO = dict(
     )
 )
 
-# Diccionario de variables
-diccionario = pd.read_parquet("data/diccionario.parquet")
-diccionario = diccionario.drop(["fase", "nivel", "grado"], axis=1)
-rubrica = pd.read_parquet("data/diccionario_rubrica.parquet")
-
-# Data de conteos
-conteo = pd.read_parquet("data/item_conteo_grado.parquet")
-conteo = conteo.merge(diccionario, how="inner", on="item").merge(
-    rubrica, how="inner", on=["item", "resp"]
-)
-conteo["resp"] = (
-    conteo["resp"]
-    .astype("category")
-    .cat.reorder_categories(["N0", "N1", "N2", "N3"], ordered=True)
-)
-
-# Auxiliares para ordenar por nivel de respuesta
-nivel_0 = conteo.loc[conteo["resp"] == "N0", ["item", "grado", "prop"]].rename(
-    columns={"prop": "nivel_0"}
-)
-nivel_3 = conteo.loc[conteo["resp"] == "N3", ["item", "grado", "prop"]].rename(
-    columns={"prop": "nivel_3"}
-)
-
-# Data de medias
-medias = pd.read_parquet("data/item_medias.parquet")
-
-# data irt
-irt = pd.read_parquet("data/item_irt_eia.parquet")
-
-# Union con conteos
-conteo = (
-    conteo.merge(nivel_0, on=["item", "grado"], how="left")
-    .merge(nivel_3, on=["item", "grado"], how="left")
-    .merge(medias, how="left", on=["item", "grado"])
-    .merge(irt, how="left", on=["item", "grado", "resp"])
-)
-
-# Elementos unicos
-procesos = conteo["proceso"].unique()
-campos = conteo["campo"].unique()
-
-
 #### Streamlit ####
 st.set_page_config(
     page_title="Conteos - Evaluación diagnóstica 2024",
@@ -75,15 +36,27 @@ st.set_page_config(
     layout="wide",
 )
 
+@st.cache_data
+def read_conteo(ruta):
+    conteo = pl.read_parquet(ruta)
+    return conteo
+
+conteo = read_conteo("data/st_conteo.parquet")
+
+# Elementos unicos
+procesos = conteo["proceso"].unique()
+campos = conteo["campo"].unique()
+
 st.title("Conteos Evaluación Diagnóstica 2024")
 
 with st.sidebar:
     sel_nivel = st.selectbox("Nivel", options=NIVELES_GRADO.keys(), index=2)
     sel_grado = st.selectbox("Grado", options=NIVELES_GRADO[sel_nivel], index=0)
 
-conteo_filtro = conteo.loc[
-    (conteo["nivel"] == sel_nivel) & (conteo["grado"] == sel_grado)
-].sort_values(["proceso", "consigna", "inciso", "criterio_num"])
+conteo_filtro = conteo.filter(
+    pl.col("nivel") == sel_nivel,
+    pl.col("grado") == sel_grado
+).sort(["proceso", "consigna", "inciso", "criterio_num"])
 
 eia_filtro = conteo_filtro["eia"].unique()
 
@@ -92,11 +65,11 @@ with st.sidebar:
     sel_proceso = st.multiselect("Proceso", options=procesos, default=procesos)
     sel_campo = st.multiselect("Campo formativo", options=campos, default=campos)
 
-conteo_filtro = conteo_filtro.loc[
-    (conteo_filtro["eia"].isin(sel_eia))
-    & (conteo_filtro["proceso"].isin(sel_proceso))
-    & (conteo_filtro["campo"].isin(sel_campo))
-]
+conteo_filtro = conteo_filtro.filter(
+    pl.col("eia").is_in(sel_eia),
+    pl.col("proceso").is_in(sel_proceso),
+    pl.col("campo").is_in(sel_campo)
+)
 
 st.markdown("**Ordenar por:**")
 sel_orden = st.radio(
@@ -109,18 +82,18 @@ sel_orden = st.radio(
 for eia in conteo_filtro["eia"].unique():
     st.markdown(f"### {eia}")
 
-    conteo_eia = conteo_filtro.loc[conteo_filtro["eia"] == eia]
+    conteo_eia = conteo_filtro.filter(pl.col("eia") == eia)
 
     if sel_orden == "Reactivo":
-        conteo_eia = conteo_eia.sort_values(["consigna", "inciso", "item"])
+        conteo_eia = conteo_eia.sort(["consigna", "inciso", "item"])
     elif sel_orden == "Proceso":
-        conteo_eia = conteo_eia.sort_values(["proceso", "item"])
+        conteo_eia = conteo_eia.sort(["proceso", "item"])
     elif sel_orden == "Campo":
-        conteo_eia = conteo_eia.sort_values(["campo", "item"])
+        conteo_eia = conteo_eia.sort(["campo", "item"])
     elif sel_orden == "Nivel 0":
-        conteo_eia = conteo_eia.sort_values(["nivel_0", "item"])
+        conteo_eia = conteo_eia.sort(["nivel_0", "item"])
     elif sel_orden == "Nivel 3":
-        conteo_eia = conteo_eia.sort_values(["nivel_3", "item"])
+        conteo_eia = conteo_eia.sort(["nivel_3", "item"])
 
     # Generar plot multiple
     plot_medias = make_subplots(
@@ -132,14 +105,14 @@ for eia in conteo_filtro["eia"].unique():
     )
 
     # Plot media de puntaje
-    conteo_media = conteo_eia[["item", "media", "proceso"]].drop_duplicates()
+    conteo_media = conteo_eia.select(pl.col(["item", "media", "proceso"])).unique()
     plot_medias.add_trace(
         go.Scatter(
             x=conteo_media["item"],
             y=conteo_media["media"],
             name="Media",
             mode="lines+markers+text",
-            text=round(conteo_media["media"], 2),
+            text=conteo_media["media"].round(2),
             hovertext=conteo_media["proceso"],
             textposition="top center",
             marker=dict(color="#adb5bd"),
@@ -155,16 +128,18 @@ for eia in conteo_filtro["eia"].unique():
     )
     # Plot Dificultad irt
     for resp in conteo_eia["resp"].unique():
-        conteo_irt = conteo_eia.loc[
-            conteo_eia["resp"] == resp, ["item", "dificultad", "resp"]
-        ]
+        conteo_irt = (
+            conteo_eia
+            .filter(pl.col("resp") == resp)
+            .select(pl.col(["item", "dificultad", "resp"]))
+        )
         plot_medias.append_trace(
             go.Scatter(
                 x=conteo_irt["item"],
                 y=conteo_irt["dificultad"],
                 mode="markers+text",
                 name=resp,
-                text=round(conteo_irt["dificultad"]),
+                text=conteo_irt["dificultad"].round(),
                 textposition="middle right",
                 marker=dict(color=COLORES_RESP[resp]),
                 showlegend=False,
@@ -179,15 +154,17 @@ for eia in conteo_filtro["eia"].unique():
         )
     # Plot proporcion de niveles
     for resp in conteo_eia["resp"].unique():
-        conteo_eia_resp = conteo_eia.loc[
-            conteo_eia["resp"] == resp, ["resp", "item", "prop"]
-        ]
+        conteo_eia_resp = (
+            conteo_eia
+            .filter(pl.col("resp") == resp)
+            .select(pl.col(["resp", "item", "prop"]))
+            )
         plot_medias.append_trace(
             go.Bar(
                 x=conteo_eia_resp["item"],
                 y=conteo_eia_resp["prop"],
                 name=resp,
-                text=round(conteo_eia_resp["prop"]),
+                text=conteo_eia_resp["prop"].round(),
                 insidetextanchor="middle",
                 marker=dict(color=COLORES_RESP[resp]),
             ),
