@@ -1,6 +1,21 @@
 import pyarrow
 import polars as pl
 
+PROCESOS = [
+    "No definido",
+    "Comprensión",
+    "Utilización del conocimiento",
+    "Propuesta de solución",
+    "Juicio crítico",
+]
+
+CAMPOS = [
+        "Lenguajes",
+        "Saberes y pensamiento científico",
+        "De lo humano y lo comunitario",
+        "Ética, naturaleza y sociedades",
+]
+
 # Diccionario de variables
 diccionario = pl.read_parquet("data/diccionario.parquet").drop(
     ["fase", "nivel", "grado"]
@@ -20,6 +35,10 @@ conteo = (
     pl.read_parquet("data/item_conteo_grado.parquet")
     .join(diccionario, how="inner", on="item")
     .join(rubrica, how="inner", on=["item", "resp"])
+    .with_columns(
+        pl.col("proceso").cast(pl.Enum(PROCESOS)),
+        pl.col("campo").cast(pl.Enum(CAMPOS)),
+        )
 )
 # Auxiliares para ordenar por nivel de respuesta
 nivel_0 = (
