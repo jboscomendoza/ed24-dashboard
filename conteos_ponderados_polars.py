@@ -198,15 +198,16 @@ with tab_tablas:
             st.markdown(f"## {proceso}")
             tabla_prop = (
                 tabla_prop
-                .with_columns(pl.col("prop").cast(pl.Decimal(scale=1)))
+                .with_columns(pl.col("prop").round(1).cast(pl.Decimal(scale=1)))
                 .pivot(
                     "resp",
-                    index=["criterio_titulo", "grado"],
+                    index=["criterio_clave", "criterio_titulo", "grado"],
                     values="prop",
                     aggregate_function="first",
                 )
-                .sort(["criterio_titulo", "grado"])
+                .sort(["criterio_clave", "grado"])
                 .rename({"criterio_titulo":"criterio"})
+                .drop("criterio_clave")
                 .rename(str.capitalize)
             )
             # to_pandas para ocultar columna index
