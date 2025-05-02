@@ -45,7 +45,14 @@ RUTA_DICT = "data/diccionario.parquet"
 RUTA_RUBR = "data/diccionario_rubrica.parquet"
 RUTA_CONT = "data/item_conteo_ponderado.parquet"
 
+st.set_page_config(
+    page_title="Conteos por criterio - Evaluación diagnóstica 2024",
+    page_icon=":worm:",
+    layout="wide",
+)
 
+
+@st.cache_data
 def crear_conteo(ruta_dict, ruta_rubr, ruta_cont):
     diccionario = pl.read_parquet(ruta_dict).drop(["fase", "nivel", "grado"])
     rubrica = pl.read_parquet(ruta_rubr)
@@ -78,23 +85,15 @@ def crear_conteo(ruta_dict, ruta_rubr, ruta_cont):
 conteo = crear_conteo(RUTA_DICT, RUTA_RUBR, RUTA_CONT)
 
 #### Streamlit ####
-
-st.set_page_config(
-    page_title="Conteos por criterio - Evaluación diagnóstica 2024",
-    page_icon=":worm:",
-    layout="wide",
-)
-
 with st.sidebar:
     st.markdown("### Únicamente fase 6")
-    servicios = conteo["servicio"].unique()
-    eias = conteo["eia"].unique().to_list()
-    eias.sort()
-
+    servicios = conteo["servicio"].unique(maintain_order=True).to_list()
+    eias = conteo.sort(["eia_clave"])["eia"].unique(maintain_order=True).to_list()
     sel_servicio = st.selectbox("Servicio", options=servicios, index=0)
     sel_eia = st.selectbox("EIA", options=eias, index=0)
-    conteo_filtro = conteo.filter(pl.col("servicio") == sel_servicio)
-    conteo_filtro = conteo_filtro.filter(pl.col("eia") == sel_eia)
+    conteo_filtro = conteo.filter(
+        pl.col("servicio") == sel_servicio, pl.col("eia") == sel_eia
+    )
 
 st.title(f"{sel_eia}")
 
@@ -104,11 +103,13 @@ tab_graficas, tab_tablas, tab_espec, tab_comparativos = st.tabs(
 
 with tab_graficas:
     for proceso in PROCESOS:
-        conteo_proceso = conteo_filtro.filter(pl.col("proceso") == proceso)
+        conteo_proceso = conteo_filtro.filter(pl.col("proceso") == proceso).sort(["criterio_clave"])
         if not conteo_proceso.is_empty():
             st.markdown(f"## {proceso}")
-            num_grados = len(conteo_proceso["grado"].unique().to_list())
-            criterios = conteo_proceso["criterio"].unique().to_list()
+            # Numero de grados para definir el ancho de los graficos
+            num_grados = len(conteo_proceso["grado"].unique(maintain_order=True).to_list())
+            criterios = conteo_proceso["criterio"].unique(maintain_order=True).to_list()
+            
             # Divide HTML de color y texto del criterio
             html_criterios = [i.split("<br>")[0] for i in criterios]
             texto_criterios = [i.split("<br>")[1] for i in criterios]
@@ -141,7 +142,7 @@ with tab_graficas:
             for id_criterio in range(num_criterios):
                 criterio = criterios[id_criterio]
                 conteo_criterio = conteo_proceso.filter(pl.col("criterio") == criterio)
-                for resp in conteo_criterio["resp"].unique().to_list():
+                for resp in conteo_criterio["resp"].unique(maintain_order=True).to_list():
                     conteo_resp = conteo_criterio.filter(pl.col("resp") == resp)
                     figura.add_trace(
                         go.Bar(
@@ -223,8 +224,7 @@ with tab_espec:
                 )
             )
             st.markdown("### Niveles de la rúbrica")
-            criterios_titulo = tabla_proceso["criterio_titulo"].unique().to_list()
-            criterios_titulo.sort()
+            criterios_titulo = tabla_proceso["criterio_titulo"].unique(maintain_order=True).to_list()
             sel_criterios = st.selectbox("Criterio", options=criterios_titulo, index=0)
             tabla_criterio = (
                 tabla_proceso.filter(
