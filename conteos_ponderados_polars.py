@@ -87,7 +87,7 @@ conteo = crear_conteo(RUTA_DICT, RUTA_RUBR, RUTA_CONT)
 #### Streamlit ####
 with st.sidebar:
     st.markdown("### Únicamente fase 6")
-    servicios = conteo["servicio"].unique(maintain_order=True).to_list()
+    servicios = conteo.sort("servicio")["servicio"].unique(maintain_order=True).to_list()
     eias = conteo.sort(["eia_clave"])["eia"].unique(maintain_order=True).to_list()
     sel_servicio = st.selectbox("Servicio", options=servicios, index=0)
     sel_eia = st.selectbox("EIA", options=eias, index=0)
@@ -197,7 +197,8 @@ with tab_tablas:
         if not tabla_prop.is_empty():
             st.markdown(f"## {proceso}")
             tabla_prop = (
-                tabla_prop.with_columns(pl.col("prop").round(1))
+                tabla_prop
+                .with_columns(pl.col("prop").cast(pl.Decimal(scale=1)))
                 .pivot(
                     "resp",
                     index=["criterio_titulo", "grado"],
@@ -205,9 +206,12 @@ with tab_tablas:
                     aggregate_function="first",
                 )
                 .sort(["criterio_titulo", "grado"])
+                .rename({"criterio_titulo":"criterio"})
                 .rename(str.capitalize)
             )
-            st.table(tabla_prop)
+            # to_pandas para ocultar columna index
+            st.table(tabla_prop.to_pandas().set_index("Criterio"))
+            
 
 with tab_espec:
     for proceso in PROCESOS:
@@ -220,6 +224,7 @@ with tab_espec:
                     tabla_proceso.select(pl.col(COLS_INFORMACION))
                     .unique()
                     .sort(["campo", "criterio_titulo"])
+                    .rename({"criterio_titulo":"criterio"})
                     .rename(str.capitalize)
                 )
             )
