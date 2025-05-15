@@ -84,13 +84,26 @@ def crear_conteo(ruta_dict, ruta_rubr, ruta_cont):
 conteo = crear_conteo(RUTA_DICT, RUTA_RUBR, RUTA_CONT)
 
 #### Streamlit ####
-with st.sidebar:
-    st.markdown("### Fases 2 a 6")
-    eias = conteo.sort(["eia_clave"])["eia"].unique(maintain_order=True).to_list()
-    sel_eia = st.selectbox("EIA", options=eias, index=0)
-    conteo_filtro = conteo.filter(pl.col("eia") == sel_eia)
+st.markdown("**Ejercicio Integrador del Aprendizaje**")
+eias = conteo.sort(["eia_clave"])["eia"].unique(maintain_order=True).to_list()
+sel_eia = st.selectbox("EIA", options=eias, index=0, label_visibility="collapsed")
+conteo_filtro = conteo.filter(pl.col("eia") == sel_eia)
+
+fase   = conteo_filtro["fase"].unique(maintain_order=True).to_list()
+nivel  = conteo_filtro["nivel"].unique(maintain_order=True).to_list()[0].lower()
+grados = conteo_filtro["grado"].unique(maintain_order=True).to_list()
 
 st.title(f"{sel_eia}")
+
+
+if len(grados) == 1:
+    grados_plural = ""
+    grados_texto = str(grados[0])
+else:
+    grados_plural = "s"
+    grados_texto = " y ".join([str(i) for i in grados])
+
+st.markdown(f"**Fase {fase[0]}. Nivel {nivel}. Grado{grados_plural} {grados_texto}.**")
 
 tab_graficas, tab_tablas, tab_espec = st.tabs(
     [
@@ -105,6 +118,7 @@ with tab_graficas:
         conteo_proceso = conteo_filtro.filter(pl.col("proceso") == proceso).sort(
             ["criterio_clave"]
         )
+
         if not conteo_proceso.is_empty():
             st.markdown(f"## {proceso}")
             # Numero de grados para definir el ancho de los graficos
