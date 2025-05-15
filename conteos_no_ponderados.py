@@ -41,6 +41,7 @@ PROCESOS = [
     "Juicio crítico",
 ]
 COLS_INFORMACION = ["campo", "contenido", "pda", "descriptor", "criterio_titulo"]
+COLS_GENERAL = ["campo", "pda", "descriptor", "consigna", "criterio_titulo", "proceso"]
 RUTA_DICT = "data/diccionario.parquet"
 RUTA_RUBR = "data/diccionario_rubrica.parquet"
 RUTA_CONT = "data/item_conteo_nacional.parquet"
@@ -108,8 +109,8 @@ st.markdown(f"**Fase {fase[0]}. Nivel {nivel}. Grado{grados_plural} {grados_text
 tab_graficas, tab_tablas, tab_espec = st.tabs(
     [
         "Gráficas",
-        "Tablas",
-        "Especificaciones",
+        "Tablas de datos",
+        "Estructura del EIA",
     ]
 )
 
@@ -234,11 +235,22 @@ with tab_tablas:
             st.table(tabla_prop.to_pandas().set_index("Criterio"))
 
 with tab_espec:
+    st.table(
+        conteo_filtro
+        .sort(["consigna", "criterio_clave"])
+        .select(pl.col(COLS_GENERAL))
+        .unique(maintain_order=True)
+        .rename({"criterio_titulo": "criterio", "proceso":"habilidad"})
+        .rename(str.capitalize)
+        .to_pandas()
+        .set_index(["Campo"])
+    )
+    st.markdown("## Estructura por habilidad")
     for proceso in PROCESOS:
         tabla_proceso = conteo_filtro.filter(pl.col("proceso") == proceso)
         if not tabla_proceso.is_empty():
-            st.markdown(f"## {proceso}")
-            st.markdown("### Contenidos")
+            st.markdown(f"### {proceso}")
+            st.markdown("**Contenidos**")
             st.table(
                 (
                     tabla_proceso.select(pl.col(COLS_INFORMACION))
@@ -248,7 +260,7 @@ with tab_espec:
                     .rename(str.capitalize)
                 )
             )
-            st.markdown("### Niveles de la rúbrica")
+            st.markdown("**Niveles de la rúbrica**")
             criterios_titulo = (
                 tabla_proceso["criterio_titulo"].unique(maintain_order=True).to_list()
             )
