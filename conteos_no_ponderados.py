@@ -46,6 +46,7 @@ RUTA_DICT = "data/diccionario.parquet"
 RUTA_RUBR = "data/diccionario_rubrica.parquet"
 RUTA_CONT = "data/item_conteo_nacional.parquet"
 
+
 st.set_page_config(
     page_title="Conteos por criterio - Evaluación diagnóstica 2024",
     page_icon=":worm:",
@@ -54,7 +55,15 @@ st.set_page_config(
 
 
 @st.cache_data
-def crear_conteo(ruta_dict, ruta_rubr, ruta_cont):
+def crear_conteo(ruta_dict: str, ruta_rubr: str, ruta_cont: str) -> pl.DataFrame:
+    """Une los datos del diccionario de variables, rubricas y conteos.
+    Parameters:
+        ruta_dict (str): Ruta al achivo parquet con diccionario de variables
+        ruta_rubr (str): Ruta al achivo parquet con contenido de rúbricas
+        ruta_cont (str): Ruta al achivo parquet con conteos
+    Return:
+        conteo (pl.DataFrame): Dataframe unido
+    """
     diccionario = pl.read_parquet(ruta_dict).drop(["fase", "nivel", "grado"])
     rubrica = pl.read_parquet(ruta_rubr)
     conteo_ponderado = pl.read_parquet(ruta_cont)
@@ -82,6 +91,45 @@ def crear_conteo(ruta_dict, ruta_rubr, ruta_cont):
     return conteo
 
 
+def calc_ancho_plot(n_grados: int, n_criterios: int) -> int:
+    """Devuelve el ancho de un subplot con varios criterios.
+    Parameters:
+        n_grados (int): Cantidad de grados en los que se aplicó el EIA
+        n_criterios (int): Cantidad de criterios a graficar
+    Returns:
+        ancho_plot (int): Ancho del subplot
+    """
+    if n_grados > 1:
+        ancho_col = 70
+    else:
+        ancho_col = 80
+    ancho_plot = (ancho_col * n_grados * n_criterios) + 70
+    return ancho_plot
+
+
+def criterios_html(lista_criterios: list, n_grados: int) -> list:
+    """Devuelve una lista de criterios con campo formativo con colores html, truncada a tres renglones.
+    Parameters:
+        lista_criterios (list): Lista con criterios en la forma \<span style='color': ... ;></span>\<br> ...
+        n_grados (int): Cantidad de grados en los que se aplicó el EIA
+    Returns:
+        html_texto (list): Lista con criterios con colores html, truncada a tres renglones
+    """
+    html_criterios = [i.split("<br>")[0] for i in lista_criterios]
+    texto_criterios = [i.split("<br>")[1] for i in lista_criterios]
+    # Texto del criterio truncado a tres renglones
+    ancho_lab = 24 if n_grados > 1 else 18
+    texto_criterios = [
+        "<br>".join(wrap(i, width=ancho_lab, max_lines=3, placeholder="..."))
+        for i in texto_criterios
+    ]
+    # HTML + Texto para mostrar con color
+    html_texto = [
+        f"{html}<br>{texto}" for html, texto in zip(html_criterios, texto_criterios)
+    ]
+    return html_texto
+
+
 conteo = crear_conteo(RUTA_DICT, RUTA_RUBR, RUTA_CONT)
 
 #### Streamlit ####
@@ -90,12 +138,11 @@ eias = conteo.sort(["eia_clave"])["eia"].unique(maintain_order=True).to_list()
 sel_eia = st.selectbox("EIA", options=eias, index=0, label_visibility="collapsed")
 conteo_filtro = conteo.filter(pl.col("eia") == sel_eia)
 
-fase   = conteo_filtro["fase"].unique(maintain_order=True).to_list()
-nivel  = conteo_filtro["nivel"].unique(maintain_order=True).to_list()[0].lower()
+fase = conteo_filtro["fase"].unique(maintain_order=True).to_list()
+nivel = conteo_filtro["nivel"].unique(maintain_order=True).to_list()[0].lower()
 grados = conteo_filtro["grado"].unique(maintain_order=True).to_list()
 
 st.title(f"{sel_eia}")
-
 
 if len(grados) == 1:
     grados_plural = ""
@@ -115,132 +162,111 @@ tab_graficas, tab_tablas, tab_espec = st.tabs(
 )
 
 with tab_graficas:
+    # Numero de grados para definir el ancho de los graficos
+    num_grados = len(conteo_filtro["grado"].unique(maintain_order=True).to_list())
     for proceso in PROCESOS:
         conteo_proceso = conteo_filtro.filter(pl.col("proceso") == proceso).sort(
             ["criterio_clave"]
         )
-
-        if not conteo_proceso.is_empty():
-            st.markdown(f"## {proceso}")
-            # Numero de grados para definir el ancho de los graficos
-            num_grados = len(
-                conteo_proceso["grado"].unique(maintain_order=True).to_list()
-            )
-            criterios = conteo_proceso["criterio"].unique(maintain_order=True).to_list()
-
-            # Divide HTML de color y texto del criterio
-            html_criterios = [i.split("<br>")[0] for i in criterios]
-            texto_criterios = [i.split("<br>")[1] for i in criterios]
-            num_criterios = len(criterios)
-            # Texto del criterio truncado a tres renglones
-            if num_grados > 1:
-                ancho_col = 70
-                ancho_lab = 24
-            else:
-                ancho_col = 80
-                ancho_lab = 18
-            ancho_plot = (ancho_col * num_grados * num_criterios) + 70
-            texto_criterios = [
-                "<br>".join(wrap(i, width=ancho_lab, max_lines=3, placeholder="..."))
-                for i in texto_criterios
-            ]
-            # HTML + Texto para mostrar con color
-            nom_criterios = [
-                f"{i}<br>{j}" for i, j in zip(html_criterios, texto_criterios)
-            ]
-            figura = make_subplots(
-                rows=1,
-                cols=num_criterios,
-                subplot_titles=nom_criterios,
-                x_title="Grado",
-                y_title="Porcentaje",
-                shared_xaxes=True,
-                shared_yaxes=True,
-            )
-            for id_criterio in range(num_criterios):
-                criterio = criterios[id_criterio]
-                conteo_criterio = conteo_proceso.filter(pl.col("criterio") == criterio)
-                for resp in (
-                    conteo_criterio["resp"].unique(maintain_order=True).to_list()
-                ):
-                    conteo_resp = conteo_criterio.filter(pl.col("resp") == resp)
-                    figura.add_trace(
-                        go.Bar(
-                            x=conteo_resp["grado"],
-                            y=conteo_resp["prop"],
-                            name=resp,
-                            showlegend=False,
-                            text=conteo_resp["prop"].round(1).to_list(),
-                            hovertext=conteo_resp["campo"]
-                            + "<br>Consigna "
-                            + conteo_resp["consigna"]
-                            + "<br>Inciso "
-                            + conteo_resp["inciso"],
-                            insidetextanchor="middle",
-                            marker=dict(
-                                color=COLORES_RESP[resp],
-                            ),
+        if conteo_proceso.is_empty():
+            continue
+        st.markdown(f"## {proceso}")
+        # Criterios a graficar
+        criterios = conteo_proceso["criterio"].unique(maintain_order=True).to_list()
+        num_criterios = len(criterios)
+        nom_criterios = criterios_html(criterios, num_grados)
+        # Generación de gráfico
+        ancho_plot = calc_ancho_plot(num_grados, num_criterios)
+        figura = make_subplots(
+            rows=1,
+            cols=num_criterios,
+            subplot_titles=nom_criterios,
+            x_title="Grado",
+            y_title="Porcentaje",
+            shared_xaxes=True,
+            shared_yaxes=True,
+        )
+        for id_criterio in range(num_criterios):
+            criterio = criterios[id_criterio]
+            conteo_criterio = conteo_proceso.filter(pl.col("criterio") == criterio)
+            resps = conteo_criterio["resp"].unique(maintain_order=True).to_list()
+            for resp in resps:
+                conteo_resp = conteo_criterio.filter(pl.col("resp") == resp)
+                figura.add_trace(
+                    go.Bar(
+                        x=conteo_resp["grado"],
+                        y=conteo_resp["prop"],
+                        name=resp,
+                        showlegend=False,
+                        text=conteo_resp["prop"].round(1).to_list(),
+                        hovertext=conteo_resp["campo"]
+                        + "<br>Consigna "
+                        + conteo_resp["consigna"]
+                        + "<br>Inciso "
+                        + conteo_resp["inciso"],
+                        insidetextanchor="middle",
+                        marker=dict(
+                            color=COLORES_RESP[resp],
                         ),
-                        row=1,
-                        col=id_criterio + 1,
-                    )
-            figura.update_xaxes(
-                title="",
-                type="category",
-            )
-            figura.update_yaxes(
-                title="",
-            )
-            figura.update_annotations(
-                font_size=12,
-                font_family="Noto Sans Condensed, sans",
-            )
-            figura.update_layout(
-                barmode="stack",
-                height=400,
-                width=ancho_plot,
-                margin=dict(t=70, b=25, r=15),
-                font=dict(family="Noto Sans Condensed", size=12),
-                legend_font_size=11,
-                legend_font_family="Noto Sans Condensed",
-                legend=dict(
-                    yref="container",
-                    y=1.1,
-                    orientation="h",
-                ),
-            )
-            st.plotly_chart(figura, use_container_width=False)
+                    ),
+                    row=1,
+                    col=id_criterio + 1,
+                )
+        figura.update_xaxes(
+            title="",
+            type="category",
+        )
+        figura.update_yaxes(
+            title="",
+        )
+        figura.update_annotations(
+            font_size=12,
+            font_family="Noto Sans Condensed, sans",
+        )
+        figura.update_layout(
+            barmode="stack",
+            height=400,
+            width=ancho_plot,
+            margin=dict(t=70, b=25, r=15),
+            font=dict(family="Noto Sans Condensed", size=12),
+            legend_font_size=11,
+            legend_font_family="Noto Sans Condensed",
+            legend=dict(
+                yref="container",
+                y=1.1,
+                orientation="h",
+            ),
+        )
+        st.plotly_chart(figura, use_container_width=False)
 
 with tab_tablas:
     for proceso in PROCESOS:
         tabla_prop = conteo_filtro.filter(pl.col("proceso") == proceso)
-        if not tabla_prop.is_empty():
-            st.markdown(f"## {proceso}")
-            tabla_prop = (
-                tabla_prop.with_columns(
-                    pl.col("prop").round(1).cast(pl.Decimal(scale=1))
-                )
-                .pivot(
-                    "resp",
-                    index=["criterio_clave", "criterio_titulo", "grado"],
-                    values="prop",
-                    aggregate_function="first",
-                )
-                .sort(["criterio_clave", "grado"])
-                .rename({"criterio_titulo": "criterio"})
-                .drop("criterio_clave")
-                .rename(str.capitalize)
+        if tabla_prop.is_empty():
+            continue
+        st.markdown(f"## {proceso}")
+        tabla_prop = (
+            tabla_prop.with_columns(pl.col("prop").round(1).cast(pl.Decimal(scale=1)))
+            .pivot(
+                "resp",
+                index=["criterio_clave", "criterio_titulo", "grado"],
+                values="prop",
+                aggregate_function="first",
             )
-            # to_pandas para ocultar columna index
-            st.table(tabla_prop.to_pandas().set_index("Criterio"))
+            .sort(["criterio_clave", "grado"])
+            .rename({"criterio_titulo": "criterio"})
+            .drop("criterio_clave")
+            .rename(str.capitalize)
+        )
+        # to_pandas para ocultar columna index
+        st.table(tabla_prop.to_pandas().set_index("Criterio"))
 
 with tab_espec:
     st.table(
-        conteo_filtro
-        .sort(["consigna", "criterio_clave"])
+        conteo_filtro.sort(["consigna", "criterio_clave"])
         .select(pl.col(COLS_GENERAL))
         .unique(maintain_order=True)
-        .rename({"criterio_titulo": "criterio", "proceso":"habilidad"})
+        .rename({"criterio_titulo": "criterio", "proceso": "habilidad"})
         .rename(str.capitalize)
         .to_pandas()
         .set_index(["Campo"])
@@ -248,38 +274,39 @@ with tab_espec:
     st.markdown("## Estructura por habilidad")
     for proceso in PROCESOS:
         tabla_proceso = conteo_filtro.filter(pl.col("proceso") == proceso)
-        if not tabla_proceso.is_empty():
-            st.markdown(f"### {proceso}")
-            st.markdown("**Contenidos**")
-            st.table(
-                (
-                    tabla_proceso.select(pl.col(COLS_INFORMACION))
-                    .unique()
-                    .sort(["campo", "criterio_titulo"])
-                    .rename({"criterio_titulo": "criterio"})
-                    .rename(str.capitalize)
-                )
-            )
-            st.markdown("**Niveles de la rúbrica**")
-            criterios_titulo = (
-                tabla_proceso["criterio_titulo"].unique(maintain_order=True).to_list()
-            )
-            sel_criterios = st.selectbox("Criterio", options=criterios_titulo, index=0)
-            tabla_criterio = (
-                tabla_proceso.filter(
-                    pl.col("criterio_titulo") == sel_criterios,
-                    pl.col("resp") != "Sin evidencias de desarrollo del aprendizaje",
-                )
-                .select(pl.col(["consigna", "inciso", "resp", "resp_rubrica"]))
+        if tabla_proceso.is_empty():
+            continue
+        st.markdown(f"### {proceso}")
+        st.markdown("**Contenidos**")
+        st.table(
+            (
+                tabla_proceso.select(pl.col(COLS_INFORMACION))
                 .unique()
-                .sort("resp")
-                .rename(
-                    {
-                        "consigna": "Consigna",
-                        "inciso": "Inciso",
-                        "resp": "Nivel",
-                        "resp_rubrica": "Rúbrica",
-                    }
-                )
+                .sort(["campo", "criterio_titulo"])
+                .rename({"criterio_titulo": "criterio"})
+                .rename(str.capitalize)
             )
-            st.table(tabla_criterio)
+        )
+        st.markdown("**Niveles de la rúbrica**")
+        criterios_titulo = (
+            tabla_proceso["criterio_titulo"].unique(maintain_order=True).to_list()
+        )
+        sel_criterios = st.selectbox("Criterio", options=criterios_titulo, index=0)
+        tabla_criterio = (
+            tabla_proceso.filter(
+                pl.col("criterio_titulo") == sel_criterios,
+                pl.col("resp") != "Sin evidencias de desarrollo del aprendizaje",
+            )
+            .select(pl.col(["consigna", "inciso", "resp", "resp_rubrica"]))
+            .unique()
+            .sort("resp")
+            .rename(
+                {
+                    "consigna": "Consigna",
+                    "inciso": "Inciso",
+                    "resp": "Nivel",
+                    "resp_rubrica": "Rúbrica",
+                }
+            )
+        )
+        st.table(tabla_criterio)
