@@ -150,7 +150,6 @@ for proceso in sel_proceso:
                 {
                     "criterio": "Criterio",
                     "resp": "Nivel",
-
                     "resp_nivel": "Descripcion",
                     "resp_rubrica": "Rúbrica",
                 }
