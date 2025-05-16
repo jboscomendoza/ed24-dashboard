@@ -1,15 +1,11 @@
 import pyarrow
 import streamlit as st
 import pandas as pd
+import polars as pl
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from textwrap import wrap
 
-NIVELES_GRADO = {
-    "Preescolar": [3],
-    "Primaria": [1, 2, 3, 4, 5, 6],
-    "Secundaria": [1, 2, 3],
-}
 COLORES = ["#fcb1c3", "#fce397", "#bae673", "#a4dafc"]
 COLORES_CAMPO = {
     "LEN": "#c00000",
@@ -35,9 +31,9 @@ COLORES_SERVICIO = dict(
 
 COLS_INFORMACION = ["campo", "contenido", "pda", "descriptor", "criterio_titulo"]
 
-diccionario = pd.read_parquet("data/diccionario.parquet")
-diccionario = diccionario.drop(["fase", "nivel", "grado"], axis=1)
-rubrica = pd.read_parquet("data/diccionario_rubrica.parquet")
+diccionario = pl.read_parquet("data/diccionario.parquet")
+diccionario = diccionario.drop(["fase", "nivel", "grado"])
+rubrica     = pl.read_parquet("data/diccionario_rubrica.parquet")
 
 conteo_grado = pd.read_parquet("data/item_conteo_ponderado.parquet")
 conteo_grado = (

@@ -3,12 +3,6 @@ import streamlit as st
 import polars as pl
 import plotly.graph_objects as go
 
-NIVELES_GRADO = {
-    "Preescolar": [3],
-    "Primaria": [1, 2, 3, 4, 5, 6],
-    "Secundaria": [1, 2, 3],
-}
-
 COLORES = ["#fcb1c3", "#fce397", "#bae673", "#a4dafc"]
 COLORES_RESP = dict(zip(["N0", "N1", "N2", "N3"], COLORES))
 
