@@ -1,6 +1,5 @@
-import pyarrow
 import streamlit as st
-import pandas as pd
+import polars as pl
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -24,66 +23,91 @@ COLUMNAS_TABLA = [
 ]
 COLOR_LINEA = "#9b5de5"
 COLOR_BARRA = "#bfd3c1"
+RUTA_DICCIONARIO = "data/diccionario.parquet"
+RUTA_PERSONAS = "data/personas_uni.parquet"
+RUTA_PERSONAS_DIST = "data/personas_dist.parquet"
+RUTA_IRT = "data/item_irt_eia.parquet"
+DROP_DICCIONARIO = [
+    "fase",
+    "grado",
+    "eia_clave",
+    "pda_grado",
+    "criterio_clave",
+    "peso_max",
+    "ponderador",
+]
 
-# Diccionario de variables
-diccionario = pd.read_parquet("data/diccionario.parquet")
-diccionario = diccionario.drop(
-    [
-        "fase",
-        "grado",
-        "eia_clave",
-        "pda_grado",
-        "criterio_clave",
-        "peso_max",
-        "ponderador",
-    ],
-    axis=1,
-)
-### rubrica = pd.read_parquet("data/diccionario_rubrica.parquet")
-# Data irt
-irt = pd.read_parquet("data/item_irt_eia.parquet")
-irt = irt.merge(diccionario, how="inner", on=["item"])
-# Data personas
-personas = pd.read_parquet("data/personas_uni.parquet")
-personas_dist = pd.read_parquet("data/personas_dist.parquet")
-# Elementos unicos
-procesos = irt["proceso"].unique()
-campos = irt["campo"].unique()
-
-#### Streamlit ####
 st.set_page_config(
     page_title="Perfiles - Evaluación diagnóstica 2024",
     page_icon=":worm:",
     layout="wide",
 )
+
+
+@st.cache_data
+def leer_irt(ruta_diccionario: str, ruta_irt: str) -> pl.DataFrame:
+    """Diccionario de variables y lectura de irt."""
+    diccionario = pl.read_parquet(RUTA_DICCIONARIO).drop(DROP_DICCIONARIO)
+    irt = pl.read_parquet(RUTA_IRT).join(diccionario, how="inner", on=["item"])
+    return irt
+
+
+@st.cache_data
+def leer_personas(ruta_personas: str) -> pl.DataFrame:
+    """Lectura de personas."""
+    personas = pl.read_parquet(RUTA_PERSONAS)
+    return personas
+
+
+@st.cache_data
+def leer_personas_dist(ruta_personas_dist: str) -> pl.DataFrame:
+    """Lectira de distribución de personas."""
+    personas_dist = pl.read_parquet(ruta_personas_dist)
+    return personas_dist
+
+
+irt = leer_irt(RUTA_DICCIONARIO, RUTA_IRT)
+personas = leer_personas(RUTA_PERSONAS)
+personas_dist = leer_personas_dist(RUTA_PERSONAS_DIST)
+
+# Elementos unicos
+procesos = irt["proceso"].unique()
+campos = irt["campo"].unique()
+
+#### Streamlit ####
 st.title("Perfiles Evaluación Diagnóstica 2024")
+
 # Filtro de niveles y grado
+niveles = personas["nivel"].unique()
 with st.sidebar:
-    sel_nivel = st.selectbox("Nivel", options=NIVELES_GRADO.keys(), index=2)
+    sel_nivel = st.selectbox("Nivel", options=niveles)
     sel_grado = st.selectbox("Grado", options=NIVELES_GRADO[sel_nivel], index=0)
-irt_filtro = irt.loc[
-    (irt["nivel"] == sel_nivel) & (irt["grado"] == sel_grado)
-].sort_values(["proceso", "consigna", "inciso", "criterio_num"])
-personas_filtro = personas.loc[
-    (personas["nivel"] == sel_nivel) & (personas["grado"] == str(sel_grado))
-]
-personas_dist_filtro = personas_dist.loc[
-    (personas_dist["nivel"] == sel_nivel) & (personas_dist["grado"] == sel_grado)
-]
+irt_filtro = irt.filter(
+    pl.col("nivel") == sel_nivel,
+    pl.col("grado") == sel_grado,
+).sort(["proceso", "consigna", "inciso", "criterio_num"])
+personas_filtro = personas.filter(
+    pl.col("nivel") == sel_nivel,
+    pl.col("grado") == str(sel_grado),
+)
+personas_dist_filtro = personas_dist.filter(
+    pl.col("nivel") == sel_nivel,
+    pl.col("grado") == sel_grado,
+)
 
 # Filtro de eia, proceso y campo
 with st.sidebar:
     sel_proceso = st.multiselect("Proceso", options=procesos, default=procesos)
     sel_campo = st.multiselect("Campo formativo", options=campos, default=campos)
-irt_filtro = irt_filtro.loc[
-    (irt_filtro["proceso"].isin(sel_proceso)) & (irt_filtro["campo"].isin(sel_campo))
-]
-
+irt_filtro = irt_filtro.filter(
+    pl.col("proceso").is_in(sel_proceso),
+    pl.col("campo").is_in(sel_campo),
+)
 
 # Genera elementos por cada eia seleccionado
 st.markdown(f"## Grado {sel_grado}")
 
-dificultades = irt_filtro.sort_values("dificultad").loc[:, "dificultad"].values.round(2)
+dificultades = irt_filtro.sort("dificultad")["dificultad"].round(2)
 # Controles de punto corte
 puntaje_min = personas_filtro["puntaje"].min()
 puntaje_max = personas_filtro["puntaje"].max()
@@ -98,11 +122,11 @@ with col_1:
         sel_dif = puntaje_min
 # Indicador de población debajo del punto de corte
 with col_2:
-    personas_cuantil = personas_filtro.loc[
-        personas_filtro["puntaje"] <= float(sel_dif), ["cuantil", "puntaje"]
-    ].reset_index(drop=True)
-    personas_cuantil.loc[:, "puntaje"] = personas_cuantil.loc[:, "puntaje"].round(3)
-    personas_cuantil_corte = personas_cuantil.iloc[-1]["cuantil"]
+    personas_cuantil = personas_filtro.filter(
+        pl.col("puntaje") <= float(sel_dif)
+    ).select(["cuantil", "puntaje"])
+    personas_cuantil = personas_cuantil.with_columns(pl.col("puntaje").round(3))
+    personas_cuantil_corte = personas_cuantil["cuantil"].last()
     st.metric("Personas debajo del corte.", value=personas_cuantil_corte)
 # Subplot mapa de Wright
 fig = make_subplots(
@@ -114,22 +138,22 @@ fig = make_subplots(
     horizontal_spacing=0,
 )
 # Un trace de Scatter por cada nivel de respuesta
-for resp in irt_filtro["resp"].unique():
-    irt_resp = irt_filtro.loc[irt_filtro["resp"] == resp]
+for resp in irt_filtro["resp"].unique(maintain_order=True):
+    irt_resp = irt_filtro.filter(pl.col("resp") == resp)
     fig.add_trace(
         go.Scatter(
             x=irt_resp["item"],
             y=irt_resp["dificultad"],
             name=resp,
             mode="markers+text",
-            text=irt_resp["dificultad"].round().astype(str),
+            text=irt_resp["dificultad"].round().cast(pl.String),
             textposition="top center",
             hovertext=(
-                irt_resp["criterio"].astype(str)
+                irt_resp["criterio"].cast(pl.String)
                 + "<br>"
-                + irt_resp["proceso"].astype("str")
+                + irt_resp["proceso"].cast(pl.String)
                 + "<br>"
-                + irt_resp["campo"].astype("str")
+                + irt_resp["campo"].cast(pl.String)
             ),
             marker=dict(color=COLORES_RESP[resp]),
         ),
@@ -140,13 +164,13 @@ fig.update_xaxes(title_text="Criterios", row=1, col=1)
 fig.update_yaxes(title_text="Dificultad")
 # Trace de personas, en modo vertical
 # personas_dist_filtro
-personas_dist_filtro = personas_dist_filtro.loc[
-    personas_dist_filtro["dificultad"].between(
+personas_dist_filtro = personas_dist_filtro.filter(
+    pl.col("dificultad").is_between(
         puntaje_min,
         puntaje_max,
-        inclusive="neither",
+        closed="none",
     )
-]
+)
 
 fig.add_trace(
     go.Bar(
@@ -179,14 +203,15 @@ fig.update_layout(
 )
 st.plotly_chart(fig)
 # Criterios arriba y debajo del corte
-if st.checkbox(
-    "Mostrar tabla de criterios.",
-    value=False,
-):
-    irt_cuantil = irt_filtro.sort_values("dificultad")
-    irt_cuantil.loc[:, "posicion"] = [
+if st.checkbox("Mostrar tabla de criterios.", value=False):
+    irt_cuantil = irt_filtro.sort("dificultad")
+    posiciones = [
         "Arriba" if i >= sel_dif else "Abajo" for i in irt_cuantil["dificultad"]
     ]
+    irt_cuantil = irt_cuantil.with_columns(
+        pl.col("dificultad").round(3),
+        posicion=pl.Series(posiciones),
+    )
     st.markdown("### Posición de los criterios respecto al punto de corte.")
     posiciones = st.multiselect(
         "Mostrar sólo criterios que están:",
@@ -194,16 +219,16 @@ if st.checkbox(
         default=["Arriba", "Abajo"],
     )
     irt_cuantil = irt_cuantil[COLUMNAS_TABLA]
-    st.dataframe(irt_cuantil.loc[irt_cuantil["posicion"].isin(posiciones)])
+    st.dataframe(irt_cuantil.filter(pl.col("posicion").is_in(posiciones)))
 # Tabla de cuantiles de personas
-if st.checkbox(
-    "Mostrar cuantiles de personas.",
-    value=False,
-):
-    persona_tabla = personas
-    persona_tabla.loc[:, "puntaje"] = persona_tabla.loc[:, "puntaje"].round(2)
-    persona_tabla = (
-        persona_tabla[["cuantil", "puntaje"]].reset_index(drop=True).transpose()
-    )
+if st.checkbox("Mostrar cuantiles de personas.", value=False):
     st.markdown("### Cuantiles de habilidades de las personas.")
+    persona_tabla = (
+        personas.filter(pl.col("grado") == str(sel_grado))
+        .with_columns(pl.col("puntaje").round(2))
+        .select(["cuantil", "puntaje"])
+        .to_pandas()
+        .reset_index(drop=True)
+        .transpose()
+    )
     st.table(persona_tabla)
