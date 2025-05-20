@@ -1,6 +1,7 @@
 import pyarrow
 import streamlit as st
 import pandas as pd
+import polars as pl
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -19,15 +20,8 @@ PROCESOS = [
     "No definido",
 ]
 COLORES_PROCESO = dict(zip(PROCESOS, COLORES))
-
-diccionario = pd.read_parquet("data/diccionario.parquet")
-diccionario = diccionario.drop(["grado"], axis=1)
-
-medias = pd.read_parquet("data/item_medias.parquet")
-medias = medias.merge(diccionario, how="inner", on="item")
-medias = medias.sort_values("media")
-procesos = medias["proceso"].unique()
-campos = medias["campo"].unique()
+RUTA_DICCIONARIO = "data/diccionario.parquet"
+RUTA_MEDIAS = "data/item_medias.parquet"
 
 st.set_page_config(
     page_title="Medias - Evaluación diagnóstica 2024",
@@ -35,30 +29,48 @@ st.set_page_config(
     layout="wide",
 )
 
-#### Streamlit ####
 
+@st.cache_data
+def leer_medias(ruta_diccionario: str, ruta_medias: str) -> pl.DataFrame:
+    """Lee el diccionario y medias de los ítems."""
+    diccionario = pl.read_parquet(ruta_diccionario).drop("grado")
+    medias = (
+        pl.read_parquet(ruta_medias)
+        .join(diccionario, how="inner", on="item")
+        .sort("media")
+    )
+    return medias
+
+
+medias = leer_medias(RUTA_DICCIONARIO, RUTA_MEDIAS)
+
+procesos = medias["proceso"].unique(maintain_order=True)
+campos = medias["campo"].unique(maintain_order=True)
+
+#### Streamlit ####
 st.title("Medias Evaluación Diagnóstica 2024")
 
 with st.sidebar:
     sel_cnt_nivel = st.selectbox("Nivel", options=NIVELES_GRADO.keys(), index=2)
     sel_cnt_grado = st.selectbox("Grado", options=NIVELES_GRADO[sel_cnt_nivel])
 
-medias_filtro = medias.loc[
-    (medias["nivel"] == sel_cnt_nivel) & (medias["grado"] == sel_cnt_grado)
-].sort_values(["proceso", "consigna", "inciso", "criterio_num"])
+medias_filtro = medias.filter(
+    pl.col("nivel") == sel_cnt_nivel,
+    pl.col("grado") == sel_cnt_grado,
+).sort(["proceso", "consigna", "inciso", "criterio_num"])
 
-eia_filtro = medias_filtro["eia"].unique()
+eia_filtro = medias_filtro["eia"].unique(maintain_order=True)
 
 with st.sidebar:
     sel_cnt_eia = st.multiselect("EIA", options=eia_filtro, default=eia_filtro)
     sel_cnt_proceso = st.multiselect("Proceso", options=procesos, default=procesos)
     sel_cnt_campo = st.multiselect("Campo formativo", options=campos, default=campos)
 
-medias_filtro = medias_filtro.loc[
-    (medias_filtro["eia"].isin(sel_cnt_eia))
-    & (medias_filtro["proceso"].isin(sel_cnt_proceso))
-    & (medias_filtro["campo"].isin(sel_cnt_campo))
-]
+medias_filtro = medias_filtro.filter(
+    pl.col("eia").is_in(sel_cnt_eia),
+    pl.col("proceso").is_in(sel_cnt_proceso),
+    pl.col("campo").is_in(sel_cnt_campo),
+)
 
 orden = st.radio("Ordenar por:", ["Proceso", "Media", "Reactivo"], horizontal=True)
 if st.checkbox("Limites 0-3"):
@@ -68,16 +80,14 @@ else:
 
 for eia in medias_filtro["eia"].unique():
     st.markdown(f"### {eia}")
-    medias_filtro_eia = medias_filtro.loc[medias_filtro["eia"] == eia]
+    medias_filtro_eia = medias_filtro.filter(pl.col("eia") == eia)
 
     if orden == "Proceso":
-        medias_filtro_eia = medias_filtro_eia.sort_values(["proceso", "media"])
+        medias_filtro_eia = medias_filtro_eia.sort(["proceso", "media"])
     elif orden == "Media":
-        medias_filtro_eia = medias_filtro_eia.sort_values("media", ascending=False)
+        medias_filtro_eia = medias_filtro_eia.sort("media", descending=False)
     elif orden == "Reactivo":
-        medias_filtro_eia = medias_filtro_eia.sort_values(
-            ["consigna", "inciso", "item"]
-        )
+        medias_filtro_eia = medias_filtro_eia.sort(["consigna", "inciso", "item"])
 
     figura = go.Figure(
         go.Scatter(
@@ -89,7 +99,9 @@ for eia in medias_filtro["eia"].unique():
         )
     )
     for proceso in medias_filtro_eia["proceso"].unique():
-        medias_proceso = medias_filtro_eia.loc[medias_filtro_eia["proceso"] == proceso]
+        medias_proceso = medias_filtro_eia.filter(
+            medias_filtro_eia["proceso"] == proceso
+        )
         figura.add_trace(
             go.Scatter(
                 x=medias_proceso["item"],
@@ -107,7 +119,7 @@ for eia in medias_filtro["eia"].unique():
     st.plotly_chart(figura)
     if st.checkbox("Mostrar información", key=f"check_tabla_{eia}"):
         st.dataframe(
-            medias_filtro_eia[
+            medias_filtro_eia.select(
                 ["item", "proceso", "media", "campo", "pda", "descriptor", "criterio"]
-            ]
+            ).rename(str.capitalize)
         )
