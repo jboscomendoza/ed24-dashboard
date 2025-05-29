@@ -1,8 +1,5 @@
-import pyarrow
 import streamlit as st
-import pandas as pd
 import polars as pl
-import plotly.express as px
 import plotly.graph_objects as go
 
 NIVELES_GRADO = {
